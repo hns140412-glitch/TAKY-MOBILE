@@ -1,6 +1,9 @@
 import { createSession, safeEqual, sessionCookie } from './_auth.mjs';
 
-const MAX_AGE = 24 * 60 * 60;
+// Trusted-device session: authenticate once per device/browser, then keep the
+// HttpOnly session for 30 days. New device, cookie clear, or expiry requires
+// the access key again.
+const MAX_AGE = 30 * 24 * 60 * 60;
 
 export const handler = async event => {
   if (event.httpMethod !== 'POST') {
