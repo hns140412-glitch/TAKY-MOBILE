@@ -1,4 +1,4 @@
-const CACHE='taky-mobile-mvp-v5';
+const CACHE='taky-mobile-mvp-v6-action-registry';
 const ASSETS=[
   './',
   './index.html',
@@ -9,6 +9,8 @@ const ASSETS=[
   './src/canonical.js',
   './src/auth.js',
   './src/handoff.js',
+  './src/action-registry.js',
+  './src/action-registry-ui.js',
   './manifest.webmanifest'
 ];
 
