@@ -1,11 +1,51 @@
 import { loadAppState, saveAppState } from './db.js';
 import { routeIntent, commandToIntent } from './intent.js';
 import { loadCanonical, canonicalSummary } from './canonical.js';
+import { authenticateWithKey } from './auth.js';
 import { downloadHandoff, parseResumeFile } from './handoff.js';
+
+const APPS = [
+  {
+    id:'ready-set',
+    name:'Ready & Set',
+    short:'R&S',
+    aliases:['레디앤셋','레디 앤 셋','레디셋','ready & set','ready set'],
+    url:'https://profound-ganache-902032.netlify.app',
+    status:'LINKED',
+    note:'시간표 · 숙제 · Planner',
+  },
+  {
+    id:'snap-pop',
+    name:'Snap & Pop',
+    short:'S&P',
+    aliases:['스냅팝','스냅 앤 팝','snap & pop','snap pop'],
+    url:'https://cheerful-pothos-d1c3ee.netlify.app',
+    status:'LINKED',
+    note:'글쓰기 · 표현 · Family',
+  },
+  {
+    id:'hide-seek',
+    name:'Hide & Seek',
+    short:'H&S',
+    aliases:['하이드앤씩','하이드앤시크','하이드 앤 시크','hide & seek','hide seek'],
+    url:null,
+    status:'PENDING_LINK',
+    note:'촬영 · OCR · 분석',
+  },
+  {
+    id:'zpd-word',
+    name:'ZPD Word',
+    short:'ZPD',
+    aliases:['zpd word','zpd 워드','zpd'],
+    url:'https://dainty-froyo-a6e427.netlify.app',
+    status:'LINKED',
+    note:'영어 단어장',
+  },
+];
 
 const seed = {
   works: [
-    { id:'work-1', title:'TAKY Mobile MVP', project:'TAKY Mobile', state:'IMPLEMENTATION', next:'Canonical/Handoff runtime 검증' },
+    { id:'work-1', title:'TAKY Mobile MVP', project:'TAKY Mobile', state:'IMPLEMENTATION', next:'프로젝트 허브 → 실제 운영 연결' },
     { id:'work-2', title:'MASTER 승계 감사', project:'TAKY', state:'PASS_WITH_SOURCE_GAPS', next:'비차단 HOLD 유지' },
   ],
   ideas: [
@@ -29,6 +69,33 @@ async function persist() {
   return mode;
 }
 
+function renderApps() {
+  const grid = document.getElementById('appGrid');
+  if (!grid) return;
+  grid.innerHTML = APPS.map(app => {
+    const linked = Boolean(app.url);
+    const action = linked
+      ? `<a class="app-open" href="${app.url}" target="_blank" rel="noopener" data-app-open="${app.id}">열기</a>`
+      : `<button class="app-open disabled" type="button" data-app-pending="${app.id}">연결 대기</button>`;
+    return `
+      <article class="app-card ${linked ? 'linked' : 'pending'}">
+        <div class="app-card-top">
+          <div class="app-mark">${esc(app.short)}</div>
+          <span class="app-state">${linked ? '연결됨' : '연결 대기'}</span>
+        </div>
+        <h3>${esc(app.name)}</h3>
+        <p>${esc(app.note)}</p>
+        <div class="app-actions">
+          ${action}
+          <button class="app-manage" type="button" data-app-work="${app.id}">작업</button>
+        </div>
+      </article>`;
+  }).join('');
+
+  const linkedCount = APPS.filter(app => app.url).length;
+  document.getElementById('appSummary').textContent = `${linkedCount}개 연결 · ${APPS.length - linkedCount}개 대기`;
+}
+
 function renderWork() {
   document.getElementById('workList').innerHTML = state.works.map(w => `
     <article class="card">
@@ -37,6 +104,14 @@ function renderWork() {
       <div class="meta">Next · ${esc(w.next)}</div>
       <div class="status">${esc(w.state)}</div>
     </article>`).join('');
+}
+
+function renderWorkSummary() {
+  const el = document.getElementById('workSummary');
+  if (!el) return;
+  const active = state.works.length;
+  const attention = state.works.filter(w => /HOLD|CONFLICT|REVIEW|SOURCE_GAPS|REQUIRED/i.test(w.state || '')).length;
+  el.textContent = attention ? `진행 ${active} · 확인 필요 ${attention}` : `진행 작업 ${active}개`;
 }
 
 function renderLab() {
@@ -62,7 +137,11 @@ function renderTrace() {
 }
 
 function renderAll() {
-  renderWork(); renderLab(); renderTrace();
+  renderApps();
+  renderWork();
+  renderWorkSummary();
+  renderLab();
+  renderTrace();
 }
 
 function addMessage(text, who='assistant') {
@@ -90,21 +169,50 @@ async function addTrace(intent, source='User input', implementation='Runtime MVP
   renderTrace();
 }
 
+function activateScreen(target) {
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.target === target));
+  document.querySelectorAll('.screen').forEach(screen => screen.classList.toggle('active', screen.dataset.screen === target));
+  renderAll();
+}
+
+function findApp(text='') {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  return APPS.find(app => app.aliases.some(alias => normalized.includes(alias.toLowerCase())));
+}
+
+function isOpenRequest(text='') {
+  return /열어|실행|접속|켜줘|바로가기|open|launch/i.test(text);
+}
+
 function openPalette() { document.getElementById('palette').classList.remove('hidden'); }
 function closePalette() { document.getElementById('palette').classList.add('hidden'); }
+function openAuthSheet() {
+  const sheet = document.getElementById('authSheet');
+  const input = document.getElementById('authKeyInput');
+  document.getElementById('authError').textContent = '';
+  sheet.classList.remove('hidden');
+  setTimeout(() => input.focus(), 80);
+}
+function closeAuthSheet() {
+  document.getElementById('authSheet').classList.add('hidden');
+  document.getElementById('authKeyInput').value = '';
+}
 
 async function refreshCanonical(force=false) {
   const status = document.getElementById('canonicalStatus');
   status.textContent = 'Canonical: checking…';
-  canonicalResult = await loadCanonical({ force });
+  canonicalResult = await loadCanonical({ force, allowAuthPrompt:false });
   const summary = canonicalSummary(canonicalResult);
   status.textContent = `${summary.label} · ${summary.detail}`;
   document.getElementById('statusBtn').textContent = summary.verified ? 'CANONICAL OK' : 'RUNTIME MVP';
+  document.getElementById('authBtn')?.classList.toggle('hidden', !canonicalResult.authRequired);
   if (force) {
     await addTrace('CANONICAL_REFRESH', 'GitHub TAKY via secure gateway', summary.detail, summary.verified ? 'REMOTE_VERIFIED' : canonicalResult.source);
     addMessage(summary.verified
       ? `최신 TAKY canonical을 확인했습니다. <b>${esc(summary.detail)}</b>`
-      : `Canonical 새로고침 결과: <b>${esc(canonicalResult.source)}</b>. 캐시 또는 로컬 상태를 사용합니다.`);
+      : canonicalResult.authRequired
+        ? '이 기기는 인증이 필요합니다. <b>기기 인증</b>을 눌러 최초 1회 인증하세요.'
+        : `Canonical 새로고침 결과: <b>${esc(canonicalResult.source)}</b>. 캐시 또는 로컬 상태를 사용합니다.`);
   }
 }
 
@@ -156,20 +264,65 @@ async function executeIntent(intent, rawText='') {
       addMessage('Full forensic recovery는 명시 호출 전용입니다. 현재 MVP에는 원대화 전체 검색 adapter가 아직 연결되지 않아 <b>RECOVERY_REQUIRED</b>로 유지합니다.');
       return;
     case 'CHAT':
-    default:
+    default: {
+      const app = findApp(rawText);
+      if (app && isOpenRequest(rawText)) {
+        await addTrace('APP_OPEN', app.name, app.url || 'Link pending', app.url ? 'LINK_VERIFIED' : 'LINK_REQUIRED');
+        if (app.url) {
+          addMessage(`<b>${esc(app.name)}</b>을 엽니다.`);
+          window.location.assign(app.url);
+        } else {
+          addMessage(`<b>${esc(app.name)}</b>은 아직 배포 링크가 검증되지 않아 열지 않았습니다. 연결 확인 후 활성화합니다.`);
+        }
+        return;
+      }
       await addTrace('CHAT', rawText ? 'Natural language' : 'Fallback', 'AI provider not connected', 'ROUTED_LOCAL');
-      addMessage('자연어 Intent Router가 입력을 받았습니다. 아직 AI Provider/Gateway가 연결되지 않아 실행은 로컬 라우팅 단계까지입니다.');
+      addMessage('자연어 Intent Router가 입력을 받았습니다. 현재는 앱 열기와 로컬 명령 라우팅까지 동작하며, AI Provider/Gateway 연결은 다음 단계입니다.');
+    }
   }
 }
 
 function bindNavigation() {
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.querySelector(`[data-screen="${btn.dataset.target}"]`).classList.add('active');
-    renderAll();
-  }));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => activateScreen(btn.dataset.target)));
+  document.getElementById('openWorkBtn')?.addEventListener('click', () => activateScreen('work'));
+}
+
+function bindAppHub() {
+  document.getElementById('appGrid')?.addEventListener('click', event => {
+    const workBtn = event.target.closest('[data-app-work]');
+    if (workBtn) {
+      const app = APPS.find(item => item.id === workBtn.dataset.appWork);
+      activateScreen('work');
+      addMessage(`<b>${esc(app?.name || '앱')}</b> 관련 작업을 WORK에서 확인하세요.`);
+      return;
+    }
+    const pendingBtn = event.target.closest('[data-app-pending]');
+    if (pendingBtn) {
+      const app = APPS.find(item => item.id === pendingBtn.dataset.appPending);
+      addMessage(`<b>${esc(app?.name || '앱')}</b>은 현재 연결 대기 상태입니다. 확인되지 않은 주소를 임의로 열지 않습니다.`);
+    }
+  });
+}
+
+function bindAuth() {
+  const authBtn = document.getElementById('authBtn');
+  const input = document.getElementById('authKeyInput');
+  const error = document.getElementById('authError');
+  authBtn?.addEventListener('click', openAuthSheet);
+  document.getElementById('authBackdrop')?.addEventListener('click', closeAuthSheet);
+  document.getElementById('authCancelBtn')?.addEventListener('click', closeAuthSheet);
+  document.getElementById('authSubmitBtn')?.addEventListener('click', async () => {
+    const key = input.value.trim();
+    if (!key) { error.textContent = '인증키를 입력하세요.'; return; }
+    error.textContent = '인증 중…';
+    const result = await authenticateWithKey(key);
+    if (!result.ok) { error.textContent = '인증키를 확인해주세요.'; return; }
+    closeAuthSheet();
+    await refreshCanonical(true);
+  });
+  input?.addEventListener('keydown', event => {
+    if (event.key === 'Enter') document.getElementById('authSubmitBtn').click();
+  });
 }
 
 function bindCommands() {
@@ -203,7 +356,7 @@ function bindEditors() {
     const title = prompt('작업 제목');
     if (!title) return;
     state.works.unshift({ id:uuid(), title, project:'UNCLASSIFIED', state:'DRAFT', next:'분류/검토' });
-    await persist(); renderWork();
+    await persist(); renderWork(); renderWorkSummary();
   });
   document.getElementById('addIdeaBtn').addEventListener('click', async () => {
     const title = prompt('아이디어');
@@ -236,6 +389,8 @@ async function init() {
   state = await loadAppState(seed);
   renderAll();
   bindNavigation();
+  bindAppHub();
+  bindAuth();
   bindCommands();
   bindComposer();
   bindEditors();
