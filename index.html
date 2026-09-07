@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>TAKY Mobile</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <div class="brand">TAKY</div>
+        <div class="subtitle">Think Again, Keep Your Key.</div>
+      </div>
+      <button id="statusBtn" class="status-chip">LOCAL MVP</button>
+    </header>
+
+    <main id="screen">
+      <section class="screen active" data-screen="taky">
+        <div class="context-card">
+          <div class="eyebrow">CURRENT CONTEXT</div>
+          <div class="context-title" id="contextTitle">TAKY Mobile · MVP 구현</div>
+          <div class="context-sub">Canonical: cached / Runtime: local</div>
+        </div>
+
+        <div class="chat" id="chat">
+          <div class="msg assistant">
+            <div class="bubble">준비됐어요. 자연어로 말하거나 <b>/</b>를 눌러 현재 작업에 맞는 명령을 불러오세요.</div>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="quick-row">
+            <button class="quick" data-command="review">검토</button>
+            <button class="quick" data-command="apply">반영</button>
+            <button class="quick" data-command="handoff">인수인계</button>
+          </div>
+          <div class="composer">
+            <button id="slashBtn" class="icon-btn">/</button>
+            <textarea id="input" rows="1" placeholder="타키에게 말하기"></textarea>
+            <button id="sendBtn" class="send-btn">보내기</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" data-screen="work">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">WORK OS</div>
+            <h2>진행 중인 작업</h2>
+          </div>
+          <button id="addWorkBtn" class="small-btn">+ 작업</button>
+        </div>
+        <div id="workList" class="card-list"></div>
+      </section>
+
+      <section class="screen" data-screen="lab">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">IDEA LAB</div>
+            <h2>파편 아이디어</h2>
+          </div>
+          <button id="addIdeaBtn" class="small-btn">+ 아이디어</button>
+        </div>
+        <div id="labList" class="card-list"></div>
+      </section>
+
+      <section class="screen" data-screen="trace">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">TRACE</div>
+            <h2>결정 → 구현 추적</h2>
+          </div>
+        </div>
+        <div id="traceList" class="trace-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-target="taky"><span>◉</span><small>TAKY</small></button>
+      <button class="nav-btn" data-target="work"><span>▣</span><small>WORK</small></button>
+      <button class="nav-btn" data-target="lab"><span>◇</span><small>LAB</small></button>
+      <button class="nav-btn" data-target="trace"><span>↔</span><small>TRACE</small></button>
+    </nav>
+  </div>
+
+  <div id="palette" class="sheet hidden">
+    <div class="sheet-backdrop" id="paletteBackdrop"></div>
+    <div class="sheet-panel">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">지금 할 수 있는 것</div>
+      <button class="sheet-item" data-command="review"><b>검토</b><span>현재 내용과 기준 비교</span></button>
+      <button class="sheet-item" data-command="apply"><b>반영</b><span>검토 후 승인 가능한 변경 반영 흐름</span></button>
+      <button class="sheet-item" data-command="source_compare"><b>원본 대조</b><span>원본·이전 결과와 비교</span></button>
+      <button class="sheet-item" data-command="handoff"><b>인수인계</b><span>새 대화용 상태 지도 생성</span></button>
+      <button class="sheet-item" data-command="close"><b>대화 종료</b><span>저장·상태·다음 작업 정리</span></button>
+    </div>
+  </div>
+
+  <script src="./src/app.js" defer></script>
+</body>
+</html>
