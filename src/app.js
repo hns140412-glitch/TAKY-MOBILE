@@ -1,31 +1,36 @@
-const KEY = 'taky-mobile-mvp-v1';
+import { loadAppState, saveAppState } from './db.js';
+import { routeIntent, commandToIntent } from './intent.js';
+import { loadCanonical, canonicalSummary } from './canonical.js';
+import { downloadHandoff, parseResumeFile } from './handoff.js';
 
 const seed = {
   works: [
-    {id:'work-1', title:'TAKY Mobile MVP', project:'TAKY Mobile', state:'IMPLEMENTATION', next:'Command/Intent 기본동작 검증'},
-    {id:'work-2', title:'MASTER 승계 감사', project:'TAKY', state:'PASS_WITH_SOURCE_GAPS', next:'비차단 HOLD 유지'}
+    { id:'work-1', title:'TAKY Mobile MVP', project:'TAKY Mobile', state:'IMPLEMENTATION', next:'Canonical/Handoff runtime 검증' },
+    { id:'work-2', title:'MASTER 승계 감사', project:'TAKY', state:'PASS_WITH_SOURCE_GAPS', next:'비차단 HOLD 유지' },
   ],
   ideas: [
-    {id:'idea-1', title:'Shared Engine first', status:'CANDIDATE', note:'공통 엔진 우선 설계'},
-    {id:'idea-2', title:'Artifact Output Contract', status:'HOLD', note:'정확한 계약은 구현 단계 재평가'}
+    { id:'idea-1', title:'Shared Engine first', status:'CANDIDATE', note:'공통 엔진 우선 설계' },
+    { id:'idea-2', title:'Artifact Output Contract', status:'HOLD', note:'정확한 계약은 구현 단계 재평가' },
   ],
   traces: [
-    {source:'이전 대화/MASTER', decision:'TAKY Mobile 별도 Project/Runtime', owner:'TAKY Mobile', implementation:'MVP package', state:'IN_PROGRESS'}
-  ]
+    { source:'이전 대화/MASTER', decision:'TAKY Mobile 별도 Project/Runtime', owner:'TAKY Mobile', implementation:'Runtime MVP', state:'IN_PROGRESS' },
+  ],
 };
 
-function load(){
-  try { return JSON.parse(localStorage.getItem(KEY)) || structuredClone(seed); }
-  catch { return structuredClone(seed); }
+let state = structuredClone(seed);
+let canonicalResult = { source:'UNAVAILABLE', bundle:null };
+
+const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const esc = value => String(value).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+async function persist() {
+  const mode = await saveAppState(state);
+  document.getElementById('statusBtn').title = `Storage: ${mode}`;
+  return mode;
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
-let state = load();
 
-function esc(v){ return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
-
-function renderWork(){
-  const el=document.getElementById('workList');
-  el.innerHTML=state.works.map(w=>`
+function renderWork() {
+  document.getElementById('workList').innerHTML = state.works.map(w => `
     <article class="card">
       <div class="eyebrow">${esc(w.project)}</div>
       <h3>${esc(w.title)}</h3>
@@ -33,18 +38,18 @@ function renderWork(){
       <div class="status">${esc(w.state)}</div>
     </article>`).join('');
 }
-function renderLab(){
-  const el=document.getElementById('labList');
-  el.innerHTML=state.ideas.map(i=>`
+
+function renderLab() {
+  document.getElementById('labList').innerHTML = state.ideas.map(i => `
     <article class="card">
       <div class="eyebrow">${esc(i.status)}</div>
       <h3>${esc(i.title)}</h3>
-      <div class="meta">${esc(i.note)}</div>
+      <div class="meta">${esc(i.note || '')}</div>
     </article>`).join('');
 }
-function renderTrace(){
-  const el=document.getElementById('traceList');
-  el.innerHTML=state.traces.map(t=>`
+
+function renderTrace() {
+  document.getElementById('traceList').innerHTML = state.traces.map(t => `
     <div class="trace-flow">
       <div class="trace-node"><strong>SOURCE</strong><span>${esc(t.source)}</span></div>
       <div class="arrow">↓</div>
@@ -56,83 +61,193 @@ function renderTrace(){
     </div>`).join('');
 }
 
-function addMessage(text, who='assistant'){
-  const chat=document.getElementById('chat');
-  const row=document.createElement('div'); row.className=`msg ${who}`;
-  const bubble=document.createElement('div'); bubble.className='bubble'; bubble.innerHTML=text;
-  row.appendChild(bubble); chat.appendChild(row);
-  row.scrollIntoView({behavior:'smooth',block:'end'});
+function renderAll() {
+  renderWork(); renderLab(); renderTrace();
 }
 
-const commandReplies = {
-  review: 'REVIEW intent를 실행했습니다. 현재 MVP에서는 <b>READ ONLY</b> 검토 흐름만 시뮬레이션합니다.',
-  apply: 'APPLY intent가 선택됐습니다. 실제 canonical write는 아직 연결하지 않았으므로 <b>승인 대기 상태</b>로 유지합니다.',
-  handoff: 'HANDOFF intent를 실행했습니다. 현재 MVP 상태를 LocalStorage에서 복구 가능한 상태로 유지하고 있습니다.',
-  source_compare: 'SOURCE_COMPARE intent를 실행했습니다. 다음 단계에서 실제 GitHub/Drive source adapter와 연결합니다.',
-  close: 'CLOSE intent를 실행했습니다. 현재 상태 저장 → 다음 작업 유지 → 재개 가능 상태로 마감합니다.'
-};
+function addMessage(text, who='assistant') {
+  const chat = document.getElementById('chat');
+  const row = document.createElement('div');
+  row.className = `msg ${who}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = text;
+  row.appendChild(bubble);
+  chat.appendChild(row);
+  row.scrollIntoView({ behavior:'smooth', block:'end' });
+}
 
-function runCommand(cmd){
-  closePalette();
-  addMessage(commandReplies[cmd] || '알 수 없는 명령입니다.');
+async function addTrace(intent, source='User input', implementation='Runtime MVP', traceState='VERIFIED_LOCAL') {
   state.traces.unshift({
-    source:'User command',
-    decision:`Intent ${cmd.toUpperCase()}`,
+    source,
+    decision:`Intent ${intent}`,
     owner:'Command / Interaction OS',
-    implementation:'Local MVP simulation',
-    state:'VERIFIED_LOCAL'
+    implementation,
+    state:traceState,
   });
-  save(); renderTrace();
+  state.traces = state.traces.slice(0, 100);
+  await persist();
+  renderTrace();
 }
 
-function openPalette(){ document.getElementById('palette').classList.remove('hidden'); }
-function closePalette(){ document.getElementById('palette').classList.add('hidden'); }
+function openPalette() { document.getElementById('palette').classList.remove('hidden'); }
+function closePalette() { document.getElementById('palette').classList.add('hidden'); }
 
-document.querySelectorAll('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>{
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.querySelector(`[data-screen="${btn.dataset.target}"]`).classList.add('active');
-  if(btn.dataset.target==='work') renderWork();
-  if(btn.dataset.target==='lab') renderLab();
-  if(btn.dataset.target==='trace') renderTrace();
-}));
-
-document.getElementById('slashBtn').addEventListener('click',openPalette);
-document.getElementById('paletteBackdrop').addEventListener('click',closePalette);
-document.querySelectorAll('[data-command]').forEach(btn=>btn.addEventListener('click',()=>runCommand(btn.dataset.command)));
-
-document.getElementById('sendBtn').addEventListener('click',()=>{
-  const input=document.getElementById('input');
-  const text=input.value.trim(); if(!text) return;
-  addMessage(esc(text),'user'); input.value='';
-  if(text === '/'){ openPalette(); return; }
-  if(text === 'ㄱ'){ addMessage('계속 진행 신호로 인식했습니다. 현재 MVP에서는 다음 구현 큐로 이동합니다.'); return; }
-  const t=text.toLowerCase();
-  if(t.includes('검토')) return runCommand('review');
-  if(t.includes('반영')) return runCommand('apply');
-  if(t.includes('인수인계')) return runCommand('handoff');
-  if(t.includes('원본')) return runCommand('source_compare');
-  if(t.includes('대화 종료')) return runCommand('close');
-  addMessage('자연어 입력을 받았습니다. 다음 단계에서 Intent Router를 실제 규칙/AI 라우터와 연결합니다.');
-});
-
-document.getElementById('input').addEventListener('keydown',(e)=>{
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('sendBtn').click(); }
-});
-
-document.getElementById('addWorkBtn').addEventListener('click',()=>{
-  const title=prompt('작업 제목'); if(!title) return;
-  state.works.unshift({id:crypto.randomUUID(),title,project:'UNCLASSIFIED',state:'DRAFT',next:'분류/검토'});
-  save(); renderWork();
-});
-document.getElementById('addIdeaBtn').addEventListener('click',()=>{
-  const title=prompt('아이디어'); if(!title) return;
-  state.ideas.unshift({id:crypto.randomUUID(),title,status:'NEW',note:'LAB에서 생성'});
-  save(); renderLab();
-});
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+async function refreshCanonical(force=false) {
+  const status = document.getElementById('canonicalStatus');
+  status.textContent = 'Canonical: checking…';
+  canonicalResult = await loadCanonical({ force });
+  const summary = canonicalSummary(canonicalResult);
+  status.textContent = `${summary.label} · ${summary.detail}`;
+  document.getElementById('statusBtn').textContent = summary.verified ? 'CANONICAL OK' : 'RUNTIME MVP';
+  if (force) {
+    await addTrace('CANONICAL_REFRESH', 'GitHub TAKY via secure gateway', summary.detail, summary.verified ? 'REMOTE_VERIFIED' : canonicalResult.source);
+    addMessage(summary.verified
+      ? `최신 TAKY canonical을 확인했습니다. <b>${esc(summary.detail)}</b>`
+      : `Canonical 새로고침 결과: <b>${esc(canonicalResult.source)}</b>. 캐시 또는 로컬 상태를 사용합니다.`);
+  }
 }
-renderWork(); renderLab(); renderTrace();
+
+async function executeIntent(intent, rawText='') {
+  closePalette();
+
+  switch (intent) {
+    case 'COMMAND_DISCOVERY':
+      openPalette();
+      return;
+    case 'CONTINUE':
+      await addTrace('CONTINUE', 'ㄱ shortcut', 'Next-action continuation');
+      addMessage('`ㄱ`을 계속 진행 신호로 인식했습니다. 현재 작업의 다음 액션을 유지합니다.');
+      return;
+    case 'REVIEW':
+      await addTrace('REVIEW', 'User request', 'Read-only governed review');
+      addMessage('REVIEW로 라우팅했습니다. <b>읽기/비교만 수행</b>하며 canonical 수정 권한은 열지 않습니다.');
+      return;
+    case 'APPLY':
+      await addTrace('APPLY', 'User request', 'Approval gate', 'APPROVAL_REQUIRED');
+      addMessage('APPLY로 라우팅했습니다. 브라우저가 직접 MASTER를 쓰지 않으며, <b>승인 + 서버측 write adapter</b>가 연결되기 전까지 APPROVAL_REQUIRED입니다.');
+      return;
+    case 'SOURCE_COMPARE': {
+      const files = canonicalResult?.bundle?.files?.map(f => f.path).join(', ');
+      await addTrace('SOURCE_COMPARE', 'Current source set', files || 'Canonical unavailable', files ? 'SOURCE_READY' : 'UNVERIFIED');
+      addMessage(files ? `현재 canonical source set: <b>${esc(files)}</b>` : '현재 canonical source를 검증된 원격 상태로 불러오지 못했습니다.');
+      return;
+    }
+    case 'HANDOFF':
+      await addTrace('HANDOFF', 'Current runtime state', 'Markdown + embedded machine state');
+      downloadHandoff(state, canonicalResult);
+      addMessage('현재 WORK/LAB/TRACE와 canonical 포인터를 포함한 <b>Handoff .md</b>를 생성했습니다.');
+      return;
+    case 'RESUME':
+      document.getElementById('resumeFileInput').click();
+      return;
+    case 'CLOSE':
+      await addTrace('CLOSE', 'Current runtime state', 'Persist + Handoff');
+      await persist();
+      downloadHandoff(state, canonicalResult);
+      addMessage('현재 상태를 저장하고 Handoff를 생성했습니다. 실제 원격 persistence는 연결된 adapter 증거가 있을 때만 완료로 판단합니다.');
+      return;
+    case 'ARCHIVE':
+      await addTrace('ARCHIVE', 'Current browser conversation', 'Archive contract pending', 'PARTIAL');
+      addMessage('현재 MVP는 앱 내부 세션만 보존할 수 있습니다. ChatGPT 전체 원문 archive와 동일하다고 주장하지 않습니다.');
+      return;
+    case 'RECOVER':
+      await addTrace('RECOVER', 'Explicit recovery request', 'Forensic workflow boundary', 'RECOVERY_REQUIRED');
+      addMessage('Full forensic recovery는 명시 호출 전용입니다. 현재 MVP에는 원대화 전체 검색 adapter가 아직 연결되지 않아 <b>RECOVERY_REQUIRED</b>로 유지합니다.');
+      return;
+    case 'CHAT':
+    default:
+      await addTrace('CHAT', rawText ? 'Natural language' : 'Fallback', 'AI provider not connected', 'ROUTED_LOCAL');
+      addMessage('자연어 Intent Router가 입력을 받았습니다. 아직 AI Provider/Gateway가 연결되지 않아 실행은 로컬 라우팅 단계까지입니다.');
+  }
+}
+
+function bindNavigation() {
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelector(`[data-screen="${btn.dataset.target}"]`).classList.add('active');
+    renderAll();
+  }));
+}
+
+function bindCommands() {
+  document.getElementById('slashBtn').addEventListener('click', openPalette);
+  document.getElementById('paletteBackdrop').addEventListener('click', closePalette);
+  document.querySelectorAll('[data-command]').forEach(btn => btn.addEventListener('click', () => executeIntent(commandToIntent(btn.dataset.command))));
+  document.getElementById('canonicalRefreshBtn').addEventListener('click', () => refreshCanonical(true));
+  document.getElementById('statusBtn').addEventListener('click', () => refreshCanonical(true));
+}
+
+function bindComposer() {
+  const input = document.getElementById('input');
+  document.getElementById('sendBtn').addEventListener('click', async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage(esc(text), 'user');
+    input.value = '';
+    const routed = routeIntent(text);
+    await executeIntent(routed.intent, text);
+  });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      document.getElementById('sendBtn').click();
+    }
+  });
+}
+
+function bindEditors() {
+  document.getElementById('addWorkBtn').addEventListener('click', async () => {
+    const title = prompt('작업 제목');
+    if (!title) return;
+    state.works.unshift({ id:uuid(), title, project:'UNCLASSIFIED', state:'DRAFT', next:'분류/검토' });
+    await persist(); renderWork();
+  });
+  document.getElementById('addIdeaBtn').addEventListener('click', async () => {
+    const title = prompt('아이디어');
+    if (!title) return;
+    state.ideas.unshift({ id:uuid(), title, status:'NEW', note:'LAB에서 생성' });
+    await persist(); renderLab();
+  });
+}
+
+function bindResume() {
+  const fileInput = document.getElementById('resumeFileInput');
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+    try {
+      const packet = await parseResumeFile(file);
+      state = packet.state;
+      await addTrace('RESUME', file.name, `Handoff ${packet.exportedAt}`, 'RESUMED_LOCAL');
+      await persist();
+      renderAll();
+      addMessage(`Handoff에서 상태를 복원했습니다. <b>${esc(file.name)}</b>`);
+    } catch (error) {
+      addMessage(`재개 실패: <b>${esc(String(error))}</b>`);
+    }
+  });
+}
+
+async function init() {
+  state = await loadAppState(seed);
+  renderAll();
+  bindNavigation();
+  bindCommands();
+  bindComposer();
+  bindEditors();
+  bindResume();
+  await refreshCanonical(false);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(error => console.warn('SW register failed', error));
+  }
+}
+
+init().catch(error => {
+  console.error(error);
+  addMessage(`Runtime 초기화 오류: <b>${esc(String(error))}</b>`);
+});
