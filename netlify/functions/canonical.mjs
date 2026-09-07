@@ -1,3 +1,5 @@
+import { isAuthorized } from './_auth.mjs';
+
 const DEFAULT_REPO = 'hns140412-glitch/TAKY';
 const DEFAULT_REF = 'main';
 const DEFAULT_FILES = [
@@ -30,13 +32,22 @@ async function fetchGithubFile(repository, path, ref, token) {
   };
 }
 
-export const handler = async () => {
+export const handler = async event => {
+  const sessionSecret = process.env.TAKY_SESSION_SECRET;
+  if (!isAuthorized(event.headers, sessionSecret)) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type':'application/json', 'Cache-Control':'no-store' },
+      body: JSON.stringify({ ok:false, error:'AUTH_REQUIRED' }),
+    };
+  }
+
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
     return {
       statusCode: 503,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      body: JSON.stringify({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }),
+      headers: { 'Content-Type':'application/json', 'Cache-Control':'no-store' },
+      body: JSON.stringify({ ok:false, error:'GITHUB_TOKEN_NOT_CONFIGURED' }),
     };
   }
 
@@ -51,22 +62,22 @@ export const handler = async () => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'private, max-age=60',
+        'Content-Type':'application/json; charset=utf-8',
+        'Cache-Control':'private, max-age=60',
       },
       body: JSON.stringify({
-        ok: true,
+        ok:true,
         repository,
         ref,
-        fetchedAt: new Date().toISOString(),
+        fetchedAt:new Date().toISOString(),
         files,
       }),
     };
   } catch (error) {
     return {
       statusCode: 502,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-      body: JSON.stringify({ ok: false, error: String(error) }),
+      headers: { 'Content-Type':'application/json', 'Cache-Control':'no-store' },
+      body: JSON.stringify({ ok:false, error:String(error) }),
     };
   }
 };
