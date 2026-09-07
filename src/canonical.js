@@ -1,7 +1,7 @@
 import { getCanonicalCache, setCanonicalCache } from './db.js';
+import { promptForAccessKey } from './auth.js';
 
 const ENDPOINT = '/.netlify/functions/canonical';
-const AUTH_ENDPOINT = '/.netlify/functions/auth';
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
 function isFresh(bundle) {
@@ -10,20 +10,7 @@ function isFresh(bundle) {
   return Number.isFinite(age) && age >= 0 && age < CACHE_TTL_MS;
 }
 
-export async function authenticateCanonical(accessKey) {
-  const response = await fetch(AUTH_ENDPOINT, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', Accept:'application/json' },
-    credentials:'include',
-    cache:'no-store',
-    body:JSON.stringify({ key:accessKey }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload?.ok) throw new Error(payload?.error || `auth ${response.status}`);
-  return payload;
-}
-
-export async function loadCanonical({ force = false } = {}) {
+export async function loadCanonical({ force = false, allowAuthPrompt = true } = {}) {
   const cached = await getCanonicalCache();
 
   if (!force && cached && isFresh(cached)) {
@@ -39,11 +26,24 @@ export async function loadCanonical({ force = false } = {}) {
   try {
     const response = await fetch(ENDPOINT, {
       headers:{ Accept:'application/json' },
-      credentials:'include',
+      credentials:'same-origin',
       cache:'no-store',
     });
 
     if (response.status === 401) {
+      if (allowAuthPrompt) {
+        const auth = await promptForAccessKey();
+        if (auth.ok) {
+          // HttpOnly session cookie is now set by the server. The access key is
+          // not persisted in JS/local storage. Retry canonical once without a
+          // second prompt to prevent loops.
+          return loadCanonical({ force:true, allowAuthPrompt:false });
+        }
+        return cached
+          ? { source:'CACHE_AUTH_REQUIRED', bundle:cached, authRequired:true, authError:auth.error }
+          : { source:'AUTH_REQUIRED', bundle:null, authRequired:true, authError:auth.error };
+      }
+
       return cached
         ? { source:'CACHE_AUTH_REQUIRED', bundle:cached, authRequired:true }
         : { source:'AUTH_REQUIRED', bundle:null, authRequired:true };
