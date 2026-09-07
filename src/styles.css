@@ -1,0 +1,26 @@
+:root {
+  --bg:#0f1012; --card:#191b20; --card2:#20232a; --text:#f7f7f4; --muted:#9da3ae;
+  --line:#2b2f37; --accent:#f0f0e8; --danger:#ffb4a9;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100dvh}
+button,textarea{font:inherit}
+button{cursor:pointer}
+#app{max-width:680px;margin:0 auto;min-height:100dvh;padding-bottom:88px}
+.topbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) 18px 14px;background:rgba(15,16,18,.93);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.brand{font-weight:900;letter-spacing:.12em;font-size:19px}.subtitle{font-size:11px;color:var(--muted);margin-top:2px}
+.status-chip,.small-btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:8px 11px;font-size:11px}
+main{padding:16px}.screen{display:none}.screen.active{display:block}
+.context-card,.card,.trace-node{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:20px;padding:16px}
+.eyebrow{font-size:10px;color:var(--muted);letter-spacing:.15em;font-weight:800}.context-title{font-size:18px;font-weight:800;margin-top:6px}.context-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.chat{min-height:42dvh;padding:18px 0 8px}.msg{display:flex;margin:10px 0}.msg.user{justify-content:flex-end}.bubble{max-width:88%;padding:13px 15px;border-radius:18px;background:var(--card2);border:1px solid var(--line);font-size:14px;line-height:1.5}.msg.user .bubble{background:var(--accent);color:#121212;border-color:transparent}
+.composer-wrap{position:sticky;bottom:76px;background:linear-gradient(transparent 0,var(--bg) 22%);padding-top:20px}.quick-row{display:flex;gap:8px;margin-bottom:8px}.quick{background:var(--card);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:999px;font-size:12px}
+.composer{display:flex;gap:8px;align-items:flex-end;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:8px}.composer textarea{flex:1;resize:none;max-height:120px;background:transparent;color:var(--text);border:0;outline:0;padding:10px 4px}.icon-btn,.send-btn{border:0;border-radius:16px;height:40px;min-width:40px}.icon-btn{background:var(--card2);color:var(--text);font-size:19px}.send-btn{background:var(--accent);color:#111;padding:0 14px;font-weight:800}
+.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(680px,100%);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(15,16,18,.96);backdrop-filter:blur(18px);border-top:1px solid var(--line);z-index:30}
+.nav-btn{background:transparent;border:0;color:var(--muted);padding:6px;border-radius:14px}.nav-btn span{display:block;font-size:20px}.nav-btn small{display:block;font-size:10px;margin-top:2px}.nav-btn.active{background:var(--card2);color:var(--text)}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin:6px 0 14px}.section-head h2{margin:4px 0 0;font-size:24px}
+.card-list{display:grid;gap:10px}.card h3{font-size:15px;margin:0 0 6px}.meta{font-size:11px;color:var(--muted)}.status{display:inline-block;margin-top:10px;padding:5px 8px;border-radius:999px;background:#272b33;font-size:10px}
+.trace-list{display:grid;gap:10px}.trace-flow{display:grid;grid-template-columns:1fr;gap:8px}.trace-node strong{display:block;font-size:12px}.trace-node span{font-size:11px;color:var(--muted)}.arrow{text-align:center;color:var(--muted)}
+.sheet.hidden{display:none}.sheet{position:fixed;inset:0;z-index:50}.sheet-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}.sheet-panel{position:absolute;left:0;right:0;bottom:0;margin:auto;max-width:680px;background:#15171b;border:1px solid var(--line);border-radius:24px 24px 0 0;padding:10px 14px calc(20px + env(safe-area-inset-bottom))}
+.sheet-handle{width:42px;height:4px;background:#565b65;border-radius:999px;margin:2px auto 12px}.sheet-title{font-weight:800;font-size:17px;margin:0 4px 10px}.sheet-item{width:100%;text-align:left;display:flex;justify-content:space-between;gap:20px;align-items:center;background:transparent;color:var(--text);border:0;border-top:1px solid var(--line);padding:15px 4px}.sheet-item span{font-size:11px;color:var(--muted);text-align:right}
