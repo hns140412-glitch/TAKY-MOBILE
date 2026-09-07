@@ -1,0 +1,11 @@
+{
+  "checks": {
+    "index_exists": true,
+    "manifest_valid_json": true,
+    "service_worker_exists": true,
+    "app_js_exists": true,
+    "css_exists": true,
+    "js_syntax_pass": true
+  },
+  "js_output": ""
+}
