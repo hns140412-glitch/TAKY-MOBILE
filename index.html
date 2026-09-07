@@ -17,15 +17,20 @@
         <div class="brand">TAKY</div>
         <div class="subtitle">Think Again, Keep Your Key.</div>
       </div>
-      <button id="statusBtn" class="status-chip">LOCAL MVP</button>
+      <button id="statusBtn" class="status-chip">RUNTIME MVP</button>
     </header>
 
     <main id="screen">
       <section class="screen active" data-screen="taky">
         <div class="context-card">
           <div class="eyebrow">CURRENT CONTEXT</div>
-          <div class="context-title" id="contextTitle">TAKY Mobile · MVP 구현</div>
-          <div class="context-sub">Canonical: cached / Runtime: local</div>
+          <div class="context-title" id="contextTitle">TAKY Mobile · Runtime MVP</div>
+          <div class="context-sub" id="canonicalStatus">Canonical: checking…</div>
+          <div class="quick-row" style="margin-top:12px;margin-bottom:0">
+            <button id="canonicalRefreshBtn" class="quick">기준 새로고침</button>
+            <button class="quick" data-command="handoff">인수인계</button>
+            <button class="quick" data-command="resume">재개</button>
+          </div>
         </div>
 
         <div class="chat" id="chat">
@@ -98,10 +103,12 @@
       <button class="sheet-item" data-command="apply"><b>반영</b><span>검토 후 승인 가능한 변경 반영 흐름</span></button>
       <button class="sheet-item" data-command="source_compare"><b>원본 대조</b><span>원본·이전 결과와 비교</span></button>
       <button class="sheet-item" data-command="handoff"><b>인수인계</b><span>새 대화용 상태 지도 생성</span></button>
+      <button class="sheet-item" data-command="resume"><b>재개</b><span>Handoff 파일에서 상태 복원</span></button>
       <button class="sheet-item" data-command="close"><b>대화 종료</b><span>저장·상태·다음 작업 정리</span></button>
     </div>
   </div>
 
-  <script src="./src/app.js" defer></script>
+  <input id="resumeFileInput" type="file" accept=".md,text/markdown" hidden />
+  <script type="module" src="./src/app.js"></script>
 </body>
 </html>
