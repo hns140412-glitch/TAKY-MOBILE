@@ -1,4 +1,4 @@
-const CACHE='taky-mobile-mvp-v4';
+const CACHE='taky-mobile-mvp-v5';
 const ASSETS=[
   './',
   './index.html',
