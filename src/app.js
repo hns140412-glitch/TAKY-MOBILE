@@ -52,7 +52,7 @@ let state = structuredClone(seed);
 let canonicalResult = { source:'UNAVAILABLE', bundle:null };
 
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const esc = value => String(value).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
+const esc = value => String(value).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 
 async function persist() {
   const mode = await saveAppState(state);
@@ -274,7 +274,7 @@ async function executeIntent(intent, rawText='') {
 }
 
 function bindNavigation() {
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => activateScreen(btn.dataset.target));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => activateScreen(btn.dataset.target)));
   document.getElementById('openWorkBtn')?.addEventListener('click', () => activateScreen('work'));
 }
 
