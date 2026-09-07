@@ -12,7 +12,7 @@ const APPS = [
     aliases:['레디앤셋','레디 앤 셋','레디셋','ready & set','ready set'],
     url:'https://profound-ganache-902032.netlify.app',
     status:'LINKED',
-    note:'시간표 · 숙제 · Planner',
+    note:'그냥! 지금 하면 돼!',
   },
   {
     id:'snap-pop',
@@ -21,25 +21,16 @@ const APPS = [
     aliases:['스냅팝','스냅 앤 팝','snap & pop','snap pop'],
     url:'https://cheerful-pothos-d1c3ee.netlify.app',
     status:'LINKED',
-    note:'글쓰기 · 표현 · Family',
+    note:'아이디어를 Snap! 이야기로 Pop!',
   },
   {
     id:'hide-seek',
     name:'Hide & Seek',
     short:'H&S',
-    aliases:['하이드앤씩','하이드앤시크','하이드 앤 시크','hide & seek','hide seek'],
-    url:null,
-    status:'PENDING_LINK',
-    note:'촬영 · OCR · 분석',
-  },
-  {
-    id:'zpd-word',
-    name:'ZPD Word',
-    short:'ZPD',
-    aliases:['zpd word','zpd 워드','zpd'],
+    aliases:['하이드앤씩','하이드앤시크','하이드 앤 시크','hide & seek','hide seek','zpd word','zpd 워드','zpd'],
     url:'https://dainty-froyo-a6e427.netlify.app',
     status:'LINKED',
-    note:'영어 단어장',
+    note:'머릿속에 숨어버린 단어 찾기',
   },
 ];
 
@@ -61,7 +52,7 @@ let state = structuredClone(seed);
 let canonicalResult = { source:'UNAVAILABLE', bundle:null };
 
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const esc = value => String(value).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const esc = value => String(value).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[m]));
 
 async function persist() {
   const mode = await saveAppState(state);
@@ -283,7 +274,7 @@ async function executeIntent(intent, rawText='') {
 }
 
 function bindNavigation() {
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => activateScreen(btn.dataset.target)));
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => activateScreen(btn.dataset.target));
   document.getElementById('openWorkBtn')?.addEventListener('click', () => activateScreen('work'));
 }
 
