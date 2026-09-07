@@ -34,9 +34,28 @@
           </div>
         </div>
 
+        <section class="hub-section" aria-labelledby="myAppsTitle">
+          <div class="hub-head">
+            <div>
+              <div class="eyebrow">MY APPS</div>
+              <h2 id="myAppsTitle" class="hub-title">앱 바로가기</h2>
+            </div>
+            <div id="appSummary" class="mini-status">확인 중</div>
+          </div>
+          <div id="appGrid" class="app-grid"></div>
+        </section>
+
+        <section class="work-snapshot">
+          <div>
+            <div class="eyebrow">CURRENT WORK</div>
+            <div id="workSummary" class="snapshot-title">진행 작업 확인 중</div>
+          </div>
+          <button id="openWorkBtn" class="quick">WORK 열기</button>
+        </section>
+
         <div class="chat" id="chat">
           <div class="msg assistant">
-            <div class="bubble">준비됐어요. 자연어로 말하거나 <b>/</b>를 눌러 현재 작업에 맞는 명령을 불러오세요.</div>
+            <div class="bubble">앱을 바로 열거나, 타키에게 자연어로 작업을 지시하세요. <b>/</b>를 누르면 현재 작업에 맞는 명령을 볼 수 있습니다.</div>
           </div>
         </div>
 
@@ -48,7 +67,7 @@
           </div>
           <div class="composer">
             <button id="slashBtn" class="icon-btn">/</button>
-            <textarea id="input" rows="1" placeholder="타키에게 말하기"></textarea>
+            <textarea id="input" rows="1" placeholder="예: 레디앤셋 열어줘"></textarea>
             <button id="sendBtn" class="send-btn">보내기</button>
           </div>
         </div>
