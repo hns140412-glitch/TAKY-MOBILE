@@ -1,6 +1,6 @@
 # TAKY Mobile MVP
 
-Status: RUNTIME MVP / NOT CANONICAL / NOT DEPLOYED
+Status: RUNTIME MVP / NOT CANONICAL / DEPLOYMENT EVIDENCED / RELEASE UNVERIFIED
 
 ## Implemented
 - Mobile-first TAKY chat shell
@@ -76,16 +76,16 @@ Default files loaded:
 - IndexedDB runtime layer: IMPLEMENTED
 - Intent Router: IMPLEMENTED_LOCAL
 - Handoff/Resume: IMPLEMENTED_LOCAL
-- trusted-device auth flow: IMPLEMENTED / DEPLOYMENT REQUIRED
-- Canonical secure gateway code: IMPLEMENTED / DEPLOYMENT REQUIRED
+- trusted-device auth flow: IMPLEMENTED / FUNCTION DEPLOYMENT EVIDENCED / LIVE BEHAVIOR UNVERIFIED
+- Canonical secure gateway code: IMPLEMENTED / FUNCTION DEPLOYMENT EVIDENCED / LIVE BEHAVIOR UNVERIFIED
 - Canonical remote runtime verification: NOT YET PASS
 - Google Drive adapter: NOT IMPLEMENTED
 - canonical write adapter: NOT IMPLEMENTED
-- Netlify deployment: NOT PERFORMED
-- release: NOT PERFORMED
+- Netlify deployment: READY at the recorded baseline; see evidence below
+- release validation: UNVERIFIED
 
-## Next implementation queue
-1. deploy Netlify preview/runtime
+## Historical implementation queue — not current execution authorization
+1. deployment exists at recorded baseline; no redeployment authorized by this documentation correction
 2. configure `GITHUB_TOKEN`, `TAKY_APP_ACCESS_KEY`, `TAKY_SESSION_SECRET`
 3. verify first-device authentication and 30-day session
 4. verify Canonical Loader against private TAKY
@@ -93,3 +93,13 @@ Default files loaded:
 6. add Google Drive source/artifact adapter
 7. integrated Handoff/Resume + regression test
 8. real mobile PWA validation
+
+
+## Documentation reconciliation — 2026-09-08
+
+Source baseline: `7ad757ef3caeb93f103c97b5fc6b6ab5efff39e9`.
+Previously retrieved Netlify production evidence: deploy `6a9ea85873979b00083c30cf`, state `ready`, commit_ref matches baseline, published `2026-09-07T12:04:53.141Z`, https://taky-mobile.netlify.app.
+This is deployment evidence only. Authenticated canonical retrieval, 30-day session behavior, real-device/offline/E2E and Release PASS remain UNVERIFIED. The earlier timeout plus reused local AUTH_REQUIRED response is not a successful fresh auth test.
+`CONTINUE` currently records a trace and acknowledgement; it does not execute the next work item. REVIEW is local routing; CHAT has no AI provider connected. Command recognition is not task completion.
+Current user-approved scope is documentation correction only. Mobile AI Gateway and external write adapters are deferred pending renewed need/cost/authority approval; existing project rules are not deleted.
+This documentation-only change uses `[skip netlify]` and does not request deployment. Runtime code/configuration are unchanged. Rollback source is the baseline commit above; review later changes before restoration.
