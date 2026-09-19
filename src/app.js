@@ -27,7 +27,7 @@ const APPS = [
     id:'hide-seek',
     name:'Hide & Seek',
     short:'H&S',
-    aliases:['하이드앤씩','하이드앤시크','하이드 앤 시크','hide & seek','hide seek','zpd word','zpd 워드','zpd'],
+    aliases:['하이드앤씩','하이드앤시크','하이드 앤 시크','hide & seek','hide seek'],
     url:'https://dainty-froyo-a6e427.netlify.app',
     status:'LINKED',
     note:'머릿속에 숨어버린 단어 찾기',
