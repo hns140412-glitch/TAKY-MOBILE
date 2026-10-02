@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm install --ignore-scripts
       - name: Guard Hide & Seek identity
         run: python tools/validate-hide-seek-name-purge.py
       - name: Check JavaScript syntax
@@ -23,3 +25,5 @@ jobs:
         run: node tools/test-badge-observation-endpoint.mjs
       - name: Validate badge producer compatibility
         run: node tools/test-badge-producer-compatibility.mjs
+      - name: Validate Netlify Blobs badge ledger
+        run: node tools/test-badge-blobs-ledger.mjs
