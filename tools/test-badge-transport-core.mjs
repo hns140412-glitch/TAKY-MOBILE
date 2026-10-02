@@ -31,8 +31,8 @@ for (const app of ['READY_SET','HIDE_SEEK','SNAP_POP']){
 
 {
   const ledger=createMemoryBadgeObservationLedger();
-  const first=ingestBadgeObservation(sample(),{ledger,now:()=> '2026-10-02T12:01:00.000Z'});
-  const second=ingestBadgeObservation(sample(),{ledger,now:()=> '2026-10-02T12:02:00.000Z'});
+  const first=await ingestBadgeObservation(sample(),{ledger,now:()=> '2026-10-02T12:01:00.000Z'});
+  const second=await ingestBadgeObservation(sample(),{ledger,now:()=> '2026-10-02T12:02:00.000Z'});
   assert.equal(first.status,'ACCEPTED');
   assert.equal(second.status,'DUPLICATE_ACCEPTED');
   assert.equal(first.receipt_id,second.receipt_id);
@@ -41,9 +41,9 @@ for (const app of ['READY_SET','HIDE_SEEK','SNAP_POP']){
 
 {
   const ledger=createMemoryBadgeObservationLedger();
-  ingestBadgeObservation(sample(),{ledger});
+  await ingestBadgeObservation(sample(),{ledger});
   const conflict={...sample(),behavior_code:'DIFFERENT_BEHAVIOR'};
-  assert.throws(()=>ingestBadgeObservation(conflict,{ledger}),/DUPLICATE_CONFLICT/);
+  await assert.rejects(()=>ingestBadgeObservation(conflict,{ledger}),/DUPLICATE_CONFLICT/);
 }
 
 {
@@ -58,7 +58,7 @@ for (const app of ['READY_SET','HIDE_SEEK','SNAP_POP']){
 
 {
   const ledger=createMemoryBadgeObservationLedger();
-  const out=ingestBadgeObservation(sample(),{ledger});
+  const out=await ingestBadgeObservation(sample(),{ledger});
   assert.deepEqual(out.matcher_input,{
     appId:'READY_SET',
     eventFamily:'SELF_CHOICE',
