@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { handleBadgeObservation } from '../netlify/functions/badge-observation.mjs';
+import { createMemoryBadgeObservationLedger } from '../netlify/functions/_badge_transport_core.mjs';
 
 const sample={
   contract_version:'TAKY_BADGE_SOURCE_OBSERVATION_V1',
@@ -18,16 +19,32 @@ const sample={
   catalog_activation_allowed:false
 };
 
-const response=await handleBadgeObservation(new Request('http://local',{
-  method:'POST',
-  headers:{'content-type':'application/json'},
-  body:JSON.stringify(sample)
-}));
-assert.equal(response.status,503);
-const body=await response.json();
-assert.equal(body.error,'BADGE_TRANSPORT_PERSISTENCE_NOT_CONFIGURED');
-assert.equal(body.badge_award_authorized,false);
-assert.equal(body.economy_mutation_authorized,false);
-assert.equal(body.catalog_activation_allowed,false);
+{
+  const ledger=createMemoryBadgeObservationLedger();
+  const response=await handleBadgeObservation(new Request('http://local',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify(sample)
+  }),{ledgerFactory:async()=>ledger});
+  assert.equal(response.status,202);
+  const body=await response.json();
+  assert.equal(body.ok,true);
+  assert.equal(body.receipt.status,'ACCEPTED');
+  assert.equal(body.badge_award_authorized,false);
+  assert.equal(body.economy_mutation_authorized,false);
+  assert.equal(body.catalog_activation_allowed,false);
+}
 
-console.log('badge observation endpoint scaffold: PASS');
+{
+  const response=await handleBadgeObservation(new Request('http://local',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify(sample)
+  }),{ledgerFactory:async()=>{throw new Error('TEST_LEDGER_UNAVAILABLE')}});
+  assert.equal(response.status,503);
+  const body=await response.json();
+  assert.equal(body.ok,false);
+  assert.equal(body.disposition,'FAIL_CLOSED');
+}
+
+console.log('badge observation endpoint: PASS');
