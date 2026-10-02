@@ -29,3 +29,5 @@ jobs:
         run: node tools/test-badge-blobs-ledger.mjs
       - name: Validate asymmetric badge source auth
         run: node tools/test-badge-source-auth.mjs
+      - name: Validate badge source key registry
+        run: node tools/test-badge-source-key-registry.mjs
