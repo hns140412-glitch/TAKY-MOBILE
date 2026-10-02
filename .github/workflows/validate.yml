@@ -31,3 +31,5 @@ jobs:
         run: node tools/test-badge-source-auth.mjs
       - name: Validate badge source key registry
         run: node tools/test-badge-source-key-registry.mjs
+      - name: Validate badge source key admin
+        run: node tools/test-badge-source-key-admin.mjs
