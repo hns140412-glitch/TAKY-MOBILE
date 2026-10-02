@@ -88,14 +88,14 @@ export function createMemoryBadgeObservationLedger(){
   };
 }
 
-export function ingestBadgeObservation(input,{ledger,now=()=>new Date().toISOString()}={}){
+export async function ingestBadgeObservation(input,{ledger,now=()=>new Date().toISOString()}={}){
   if(!ledger || typeof ledger.get !== 'function' || typeof ledger.put !== 'function')
     throw new Error('BADGE_TRANSPORT_LEDGER_REQUIRED');
 
   const observation=validateBadgeObservation(input);
   const key=`${observation.app_id}:${observation.event_id}`;
   const fingerprint=stableFingerprint(observation);
-  const existing=ledger.get(key);
+  const existing=await ledger.get(key);
 
   if(existing){
     if(existing.fingerprint !== fingerprint)
@@ -130,7 +130,8 @@ export function ingestBadgeObservation(input,{ledger,now=()=>new Date().toISOStr
     economy_mutation_authorized:false,
     catalog_activation_allowed:false
   });
-  ledger.put(key,entry);
+  if(typeof ledger.append==='function') await ledger.append(key,entry);
+  else ledger.put(key,entry);
 
   return Object.freeze({
     status:'ACCEPTED',
