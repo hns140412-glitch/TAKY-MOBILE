@@ -21,3 +21,5 @@ jobs:
         run: node tools/test-badge-transport-core.mjs
       - name: Validate badge observation endpoint scaffold
         run: node tools/test-badge-observation-endpoint.mjs
+      - name: Validate badge producer compatibility
+        run: node tools/test-badge-producer-compatibility.mjs
