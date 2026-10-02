@@ -39,6 +39,15 @@ const fixtures=[
     behavior_code:'SELF_HELP_REQUEST',
     source_contract_id:'SNAP_POP_HINT_REQUEST_V1',
     evidence_ref:'hint:explore1:0:1'
+  },
+  {
+    ...common,
+    event_id:'learning_calc_check_math_fractions_1',
+    app_id:'LEARNING_ENGINE_CORE',
+    event_family:'ERROR_CORRECTION',
+    behavior_code:'CALCULATION_CHECK',
+    source_contract_id:'LEARNING_VERIFIED_CALCULATION_CHECK_V1',
+    evidence_ref:'learning-calculation-check:before:after'
   }
 ];
 
