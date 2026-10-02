@@ -24,7 +24,7 @@ function sample(app='READY_SET'){
   };
 }
 
-for (const app of ['READY_SET','HIDE_SEEK','SNAP_POP']){
+for (const app of ['READY_SET','HIDE_SEEK','SNAP_POP','LEARNING_ENGINE_CORE']){
   const out=validateBadgeObservation(sample(app));
   assert.equal(out.app_id,app);
 }
