@@ -1,5 +1,5 @@
 const CONTRACT = 'TAKY_BADGE_SOURCE_OBSERVATION_V1';
-const ALLOWED_APPS = new Set(['READY_SET','HIDE_SEEK','SNAP_POP']);
+const ALLOWED_APPS = new Set(['READY_SET','HIDE_SEEK','SNAP_POP','LEARNING_ENGINE_CORE']);
 const REQUIRED_KEYS = [
   'contract_version','event_id','app_id','event_family','behavior_code',
   'occurred_at','source_contract_id','evidence_ref','explicit_child_action',
