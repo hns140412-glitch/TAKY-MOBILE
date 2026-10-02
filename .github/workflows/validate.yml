@@ -33,3 +33,5 @@ jobs:
         run: node tools/test-badge-source-key-registry.mjs
       - name: Validate badge source key admin
         run: node tools/test-badge-source-key-admin.mjs
+      - name: Validate trusted-device badge source key registration endpoint
+        run: node tools/test-badge-source-key-register-endpoint.mjs
