@@ -27,3 +27,5 @@ jobs:
         run: node tools/test-badge-producer-compatibility.mjs
       - name: Validate Netlify Blobs badge ledger
         run: node tools/test-badge-blobs-ledger.mjs
+      - name: Validate asymmetric badge source auth
+        run: node tools/test-badge-source-auth.mjs
