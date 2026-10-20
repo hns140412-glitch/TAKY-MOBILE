@@ -35,6 +35,20 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  fixture.projects[0].currentWorkVerified=true; // must NOT become true in server
  fixture.projects[0].localTrackedWipObserved=true;
  fixture.projects[0].workRegistrationGap=true;
+ fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
+ fixture.counts.headModifiedReachableSources=62;
+ fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
+ fixture.projects[0].recoveryNextAction='BIND_EXACT_WORK_ID_AND_REPRODUCIBLE_CONSUMER_QA_BEFORE_CURRENT_CHANGE';
+ fixture.projects[0].headEntrypointIntegrity='HTML_ENTRYPOINT_DIFFERS_FROM_HEAD';
+ fixture.projects[0].headSourceParity='SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM';
+ fixture.projects[0].headSourceDriftCount=10;
+ fixture.projects[0].headSourceMissingCount=0;
+ fixture.projects[0].headSourceUnversionedCount=0;
+ fixture.projects[0].headSourceBrowserE2EVerified=true; // untrusted input must not certify
+ fixture.projects[0].currentWorkIdRegistered=true;
+ fixture.projects[0].sourceReferenceCount=4;
+ fixture.projects[0].outputReferenceCount=3;
+ fixture.projects[0].pendingGateCount=7;
  fixture.projects[0].secretProjectPath='D:/private/source/never-send';
  fixture.work[0].title='Private D:/internal/PRIVATE_TITLE_PATH';
  fixture.alerts[0].note='F:\\work\\PRIVATE_ALERT_PATH';
@@ -72,6 +86,16 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(data.projects[0].currentWorkVerified,false);
  assert.equal(data.projects[0].localTrackedWipObserved,true);
  assert.equal(data.projects[0].workRegistrationGap,true);
+ assert.equal(data.counts.sourceHeadGuardStatus,'WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD');
+ assert.equal(data.counts.headModifiedReachableSources,62);
+ assert.equal(data.projects[0].observedRecoveryState,'LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED');
+ assert.equal(data.projects[0].headEntrypointIntegrity,'HTML_ENTRYPOINT_DIFFERS_FROM_HEAD');
+ assert.equal(data.projects[0].headSourceParity,'SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM');
+ assert.equal(data.projects[0].headSourceDriftCount,10);
+ assert.equal(data.projects[0].sourceReferenceCount,4);
+ assert.equal(data.projects[0].outputReferenceCount,3);
+ assert.equal(data.projects[0].pendingGateCount,7);
+ assert.equal(data.projects[0].headSourceBrowserE2EVerified,false);
  assert.equal(txt.includes('never-send'),false);
  assert.equal(data.work[0].title,'PRIVATE_TEXT_REDACTED');
  assert.equal(data.alerts[0].note,'PRIVATE_TEXT_REDACTED');

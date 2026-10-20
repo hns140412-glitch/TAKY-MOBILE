@@ -13,9 +13,17 @@ export default async request=>{
    const value=x.slice(0,n);
    return /(?:[A-Za-z]:[\\/]|\\\\[A-Za-z0-9_.-]+[\\/]|\/home\/|\/Users\/|Bearer\s+|(?:api[_-]?key|secret|password)\s*[:=])/i.test(value)
       ?'PRIVATE_TEXT_REDACTED':value;
- },num=x=>Number.isSafeInteger(x)&&x>=0?x:0;
+ },num=x=>Number.isSafeInteger(x)&&x>=0?x:0,
+  safeEnum=(x,values)=>values.includes(x)?x:'NOT_VERIFIED';
+ const recoveryStates=['LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED','NAMED_CANDIDATE_WITH_LOCAL_WIP_CONSUMER_QA_REQUIRED','CONFLICT_HOLD','SOURCE_UNAVAILABLE_HOLD','LOCAL_WORK_REVIEW_REQUIRED','NO_LOCAL_GIT_CHANGES_OBSERVED'];
+ const recoveryActions=['BIND_EXACT_WORK_ID_AND_REPRODUCIBLE_CONSUMER_QA_BEFORE_CURRENT_CHANGE','VERIFY_REFERENCED_INPUT_REVISION_AND_PENDING_USER_GATES','RESTORE_OR_VERIFY_ORIGINAL_REPOSITORY_BEFORE_CLAIMS','ISOLATE_CONFLICT_AND_VERIFY_WITH_OWNER','ASSIGN_EXACT_WORK_ID_AND_VERIFY_OUTCOME','INSPECT_EXISTING_RECEIPTS_BEFORE_STATUS_CHANGE'];
+ const headStatus=['WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD','PASS_STATIC_ONLY_HEAD_BROWSER_NOT_PROVEN','BLOCK','NOT_CHECKED','GUARD_SOURCE_MISSING_HOLD','GUARD_READ_FAILED_HOLD'];
+ const parity=['SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM','TRACKED_REACHABLE_SOURCES_MATCH_HEAD_NOT_BROWSER_PROVEN','NO_SOURCE_GUARD_OBSERVATION'];
+ const entry=['HTML_ENTRYPOINT_DIFFERS_FROM_HEAD','HTML_ENTRYPOINT_MATCHES_HEAD','NO_WORKTREE_HTML_ENTRYPOINT','HTML_ENTRYPOINT_NOT_VERSIONED','HEAD_COMPARISON_UNAVAILABLE','REPOSITORY_UNAVAILABLE'];
  return respond({ok:true,schema:d.schema,generatedAt:s(d.generatedAt,45),
- counts:{projects:num(d.counts?.projects),work:num(d.counts?.work),open:num(d.counts?.open),review:num(d.counts?.review),blocked:num(d.counts?.blocked),verified:num(d.counts?.verified)},
+ counts:{projects:num(d.counts?.projects),work:num(d.counts?.work),open:num(d.counts?.open),review:num(d.counts?.review),blocked:num(d.counts?.blocked),verified:num(d.counts?.verified),
+  sourceHeadGuardStatus:safeEnum(d.counts?.sourceHeadGuardStatus,headStatus),
+  headModifiedReachableSources:num(d.counts?.headModifiedReachableSources)},
  coverage:{historicalChats:num(d.coverage?.historicalChats),octoberNativeChats:num(d.coverage?.octoberNativeChats),claim:'ACCOUNT_HISTORY_NOT_COMPLETE'},
  pipeline:d.pipeline&&typeof d.pipeline==='object'?{
    notionTotal:num(d.pipeline.notionTotal),notionTextStaged:num(d.pipeline.notionTextStaged),
@@ -82,7 +90,19 @@ export default async request=>{
    currentWorkPendingGates:Math.min(100,num(x.currentWorkPendingGates)),
    currentWorkVerified:false,currentWorkSourceVerified:x.currentWorkSourceVerified===true,
    localTrackedWipObserved:x.localTrackedWipObserved===true,
-   workRegistrationGap:x.workRegistrationGap===true
+   workRegistrationGap:x.workRegistrationGap===true,
+   observedRecoveryState:safeEnum(x.observedRecoveryState,recoveryStates),
+   recoveryNextAction:safeEnum(x.recoveryNextAction,recoveryActions),
+   headEntrypointIntegrity:safeEnum(x.headEntrypointIntegrity,entry),
+   headSourceParity:safeEnum(x.headSourceParity,parity),
+   headSourceDriftCount:x.headSourceDriftCount==null?null:num(x.headSourceDriftCount),
+   headSourceMissingCount:x.headSourceMissingCount==null?null:num(x.headSourceMissingCount),
+   headSourceUnversionedCount:x.headSourceUnversionedCount==null?null:num(x.headSourceUnversionedCount),
+   headSourceBrowserE2EVerified:false,
+   currentWorkIdRegistered:x.currentWorkIdRegistered===true,
+   sourceReferenceCount:x.sourceReferenceCount==null?null:num(x.sourceReferenceCount),
+   outputReferenceCount:x.outputReferenceCount==null?null:num(x.outputReferenceCount),
+   pendingGateCount:x.pendingGateCount==null?null:num(x.pendingGateCount)
  })),
  work:d.work.map(x=>({id:s(x.id,90),project:s(x.project,50),title:s(x.title,300),status:s(x.status,40),executor:s(x.executor,60),reviewer:s(x.reviewer,60),receiptCount:num(x.receiptCount),outputCount:num(x.outputCount),lastReceipt:s(x.lastReceipt,70),verified:x.verified===true,
    preparedCount:num(x.preparedCount),noModelCount:num(x.noModelCount),callClaimCount:num(x.callClaimCount),unclassifiedReceiptCount:num(x.unclassifiedReceiptCount),

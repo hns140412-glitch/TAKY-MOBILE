@@ -6,6 +6,17 @@ export async function adminLogin(key){try{const r=await fetch(SESSION,{method:'P
 export async function adminLogout(){try{await fetch(SESSION,{method:'DELETE',credentials:'same-origin',cache:'no-store'})}catch{}}
 export async function readAdminProgress(){try{const r=await fetch(DATA,{credentials:'same-origin',cache:'no-store'}),p=await getJSON(r);if(!r.ok||p?.ok!==true)return {ok:false,error:p?.error||'ADMIN_DATA_UNAVAILABLE'};return p?.schema==='TAKY_MOBILE_ADMIN_PROGRESS_SNAPSHOT_V1'?p:{ok:false,error:'ADMIN_SCHEMA_MISMATCH'}}catch{return {ok:false,error:'ADMIN_DATA_UNAVAILABLE'}}}
 const label={BLOCKED:'차단',REVIEW:'검토',OPEN:'대기',IN_PROGRESS:'진행'};
+const recoveryLabel={
+ LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED:'CURRENT는 대기지만 로컬 변경 관측 · 작업 연결 필요',
+ NAMED_CANDIDATE_WITH_LOCAL_WIP_CONSUMER_QA_REQUIRED:'작업 ID 후보 있음 · 실제 소비 검증 필요',
+ CONFLICT_HOLD:'Git 충돌로 복구 보류',SOURCE_UNAVAILABLE_HOLD:'원본 저장소 확인 필요',
+ LOCAL_WORK_REVIEW_REQUIRED:'로컬 변경 검토 필요',
+ NO_LOCAL_GIT_CHANGES_OBSERVED:'로컬 변경 미관측 (완료 근거 아님)',
+ NOT_VERIFIED:'작업·상태 근거 미연결'
+};
+const sourceLabel={SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM:'현재 앱 소스와 Git HEAD 불일치',
+ TRACKED_REACHABLE_SOURCES_MATCH_HEAD_NOT_BROWSER_PROVEN:'검사한 참조 소스 일치 · 브라우저 복원 미검증',
+ NO_SOURCE_GUARD_OBSERVATION:'정적 소스 검사 대상 아님',NOT_VERIFIED:'정적 소스 근거 미연결'};
 // Explicit QA source area tags only; this is a view, never automatic task assignment.
 const QA_PROJECT_TAGS={
  'HIDE-SEEK':['HIDE'], 'READY-SET':['READY'], 'SNAP-POP':['SNAP'],
@@ -32,6 +43,10 @@ export function renderAdminProgress(host,data){
  const refresh=el(host,'button','관리자 스냅샷 다시 조회','quick');
  refresh.type='button';
  refresh.addEventListener('click',async()=>{refresh.disabled=true;const updated=await readAdminProgress();renderAdminProgress(host,updated)});
+ if(data.counts?.sourceHeadGuardStatus){
+  const drift=Number.isSafeInteger(data.counts.headModifiedReachableSources)?data.counts.headModifiedReachableSources:'근거 없음';
+  el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개 · 제품 복원 인증 아님','admin-caption');
+ }
  const metrics=el(host,'div','','admin-metrics');
  for(const [k,v] of [['프로젝트',data.counts.projects],['AI 작업',data.counts.work],['검토 대기',data.counts.review],['차단 기록',data.counts.blocked],['독립 검증 표시',data.counts.verified],...(data.qa?[['QA P0 공백',data.qa.gaps.filter(g=>g.priority==='P0').length]]:[])]){const c=el(metrics,'div','','admin-metric');el(c,'small',k);el(c,'strong',v)}
  const tabs=el(host,'div','','admin-switch'),projectPick=el(host,'select','','admin-search'),search=el(host,'input','','admin-search'),filter=el(host,'select','','admin-search'),results=el(host,'div','','admin-progress-results'),count=el(host,'p','','admin-caption');
@@ -57,7 +72,11 @@ export function renderAdminProgress(host,data){
      card(project.id,[`등록 ${project.registered} / WORKBENCH PROJECT_CURRENT 투영 ${project.current} · ${project.signal}`,
        `등록 작업 ${project.workCount}건 · 스냅샷에서 연결된 작업 ${linked.length}건`,
        `프로젝트 상태 파일 SHA 대조: ${project.currentProjectionShaMatched===true?'원본 투영과 일치':'미검증 또는 구형 스냅샷'} (최상위 TAKY CURRENT 승인과 별개)`,
-       `코드 기록 ${project.latestCodeAt||'미확인'} (코드 활동은 개발 완료 증명 아님)`]);n++;
+       `코드 기록 ${project.latestCodeAt||'미확인'} (코드 활동은 개발 완료 증명 아님)`,
+       `로컬 복구 상태: ${recoveryLabel[project.observedRecoveryState]||'근거 미연결'}`,
+       `HEAD 진입파일: ${project.headEntrypointIntegrity||'미검증'} · ${sourceLabel[project.headSourceParity]||'근거 미연결'} · 변경된 참조 소스 ${project.headSourceDriftCount??'미확인'}개`,
+       `원본 연결: 작업 ID 등록 ${project.currentWorkIdRegistered?'있음':'없거나 미확인'} · 원자료 참조 ${project.sourceReferenceCount??'미기록'}건 · 산출물 참조 ${project.outputReferenceCount??'미기록'}건 · 보류 조건 ${project.pendingGateCount??'미기록'}건`,
+       '위 소스 및 참조 숫자는 작업 완료·독립 QA·승인 증거가 아닙니다.']);n++;
      if(project.currentWorkId&&project.currentWorkRegistration==='CURRENT_DECLARED_UNREGISTERED'){
        card(project.currentWorkSourceVerified===true?'PROJECT CURRENT 작업 · 중앙 AI 등록부 미연결':'과거 CURRENT 투영 · 출처 재확인 필요',[
          `PROJECT CURRENT 기록 작업 ID: ${project.currentWorkId} · 원본 SHA: ${project.currentWorkSourceVerified===true?'일치':'불일치 또는 미확인'}`,

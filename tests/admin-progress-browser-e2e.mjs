@@ -23,6 +23,16 @@ let fixture={ok:true,schema:'TAKY_MOBILE_ADMIN_PROGRESS_SNAPSHOT_V1',generatedAt
 fixture.work[0].kernelExact={relation:'EXACT_REGISTERED_TASK_ID',preflightCount:1,invokedCount:1,unknownCount:0,routeRecoveryCount:1};
 fixture.work[0].preparedSourceState='PREPARED_SOURCE_AND_HEAD_DRIFT_HOLD';
 fixture.projects[0].currentProjectionShaMatched=true;
+fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
+fixture.counts.headModifiedReachableSources=2;
+fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
+fixture.projects[0].headEntrypointIntegrity='HTML_ENTRYPOINT_DIFFERS_FROM_HEAD';
+fixture.projects[0].headSourceParity='SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM';
+fixture.projects[0].headSourceDriftCount=2;
+fixture.projects[0].currentWorkIdRegistered=false;
+fixture.projects[0].sourceReferenceCount=0;
+fixture.projects[0].outputReferenceCount=0;
+fixture.projects[0].pendingGateCount=0;
 fixture.lineage={authority:'DERIVED_VIEW_ONLY_NOT_GLOBAL_CURRENT',nativeChatCount:0,topicCount:0,projectCurrentProjectionHashMatches:1,projectCount:1,exactWorkKernelLinks:1};
 fixture.kernel={source:'TAKY2_RUNTIME_READ_ONLY_NON_CANONICAL',observedFileModifiedAt:'2026-10-18T01:00:00Z',runtimeVersion:1,preflightReceipts:1,executionCallReceipts:1,actualInvocationReceipts:1,returnedReceipts:1,outcomeUnknownReceipts:0,failedReceipts:0,registeredRouteRecoveries:1,doneGateRecords:1,exactWorkLinks:1};
 if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'){
@@ -72,6 +82,12 @@ try{
    const linked=fixture.work.filter(w=>w.project===primary?.id);
    assert.equal(await page.locator('#adminProgress .admin-lineage-node').count(),6*linked.length,'six evidence stages per explicitly linked work');
    const flow=await page.locator('#adminProgress').innerText();
+   assert.match(flow,/HEAD 재현성 검사/,'admin must display worktree-vs-HEAD hold');
+   if(primary.headSourceParity==='SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM'){
+     assert.match(flow,/현재 앱 소스와 Git HEAD 불일치/);
+     assert.match(flow,/코드 활동은 개발 완료 증명 아님/);
+     assert.match(flow,/작업 완료·독립 QA·승인 증거가 아닙니다/);
+   }
    if(fixture.lineage){
      assert.match(flow,/CURRENT · 대화 출처 연결 범위/);
      assert.match(flow,/WORK_ID ↔ TAKY2 실행 계약 정확 일치/);
