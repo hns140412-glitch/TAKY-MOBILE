@@ -57,7 +57,7 @@ export function renderAdminProgress(host,data){
   el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개 · 제품 복원 인증 아님','admin-caption');
  }
  const metrics=el(host,'div','','admin-metrics');
- for(const [k,v] of [['프로젝트',data.counts.projects],['AI 작업',data.counts.work],['검토 대기',data.counts.review],['차단 기록',data.counts.blocked],['독립 검증 표시',data.counts.verified],...(data.qa?[['QA P0 공백',data.qa.gaps.filter(g=>g.priority==='P0').length]]:[])]){const c=el(metrics,'div','','admin-metric');el(c,'small',k);el(c,'strong',v)}
+ for(const [k,v] of [['프로젝트',data.counts.projects],['AI 작업',data.counts.work],['검토 대기',data.counts.review],['차단 기록',data.counts.blocked],['독립 검증 표시',data.counts.verified],...(Array.isArray(data.backlog)?[['백로그 작업',data.backlog.length]]:[]),...(data.qa?[['QA 실패',data.qa.failed],['QA P0 공백',data.qa.gaps.filter(g=>g.priority==='P0').length]]:[])]){const c=el(metrics,'div','','admin-metric');el(c,'small',k);el(c,'strong',v)}
  const tabs=el(host,'div','','admin-switch'),projectPick=el(host,'select','','admin-search'),search=el(host,'input','','admin-search'),filter=el(host,'select','','admin-search'),results=el(host,'div','','admin-progress-results'),count=el(host,'p','','admin-caption');
  projectPick.setAttribute('aria-label','오케스트라 프로젝트 선택');
  for(const p of data.projects)el(projectPick,'option',p.id).value=p.id;
@@ -66,7 +66,7 @@ export function renderAdminProgress(host,data){
  search.type='search';search.placeholder='프로젝트 · 작업명 · WORK_ID';search.setAttribute('aria-label','관리자 진행상황 검색');filter.setAttribute('aria-label','작업 상태');
  for(const [k,v] of [['','모든 상태'],['OPEN','대기'],['REVIEW','검토'],['BLOCKED','차단'],['IN_PROGRESS','진행']])el(filter,'option',v).value=k;
  const buttons=[];let mode='flow';
- for(const [k,v] of [['flow','오케스트라 흐름'],['projects','프로젝트'],['work','AI 작업·진행'],['alerts','중복·충돌'],['qa','가족앱 QA'],['stages','검증 단계'],['source','자료 범위']]){const b=el(tabs,'button',v,'quick');b.type='button';buttons.push([k,b]);b.addEventListener('click',()=>{mode=k;render()})}
+ for(const [k,v] of [['flow','오케스트라 흐름'],['projects','프로젝트'],['backlog','전체 작업·선행조건'],['work','AI 작업·진행'],['alerts','중복·충돌'],['qa','가족앱 QA'],['stages','검증 단계'],['source','자료 범위']]){const b=el(tabs,'button',v,'quick');b.type='button';buttons.push([k,b]);b.addEventListener('click',()=>{mode=k;render()})}
  function card(title,lines){const c=el(results,'article','','admin-progress-card');el(c,'h3',title);lines.forEach(x=>el(c,'p',x));return c}
  function flowNode(parent,title,detail,state){
    const node=el(parent,'li','','admin-lineage-node');node.dataset.evidence=state;
@@ -182,6 +182,26 @@ export function renderAdminProgress(host,data){
    }
  }
  else if(mode==='projects')for(const x of data.projects){const linked=data.work.filter(w=>w.project===x.id);if(st&&!linked.some(w=>w.status===st))continue;if(q&&![x.id,x.signal,x.currentWorkId,...linked.map(y=>y.title)].join(' ').toLocaleLowerCase().includes(q))continue;card(x.id,[`등록 ${x.registered} / CURRENT ${x.current}`,`AI 작업 ${x.workCount} · 보존 대화 주제 후보 ${x.historicalChats} · AI 인계 후보 ${x.relayCandidates}`,`코드 기록 ${x.latestCodeAt||'미확인'} · ${x.signal} (완료 증명 아님)`,...(x.currentWorkRegistration==='CURRENT_DECLARED_UNREGISTERED'&&x.currentWorkId?[`${x.currentWorkSourceVerified===true?'CURRENT SHA 일치':'CURRENT 출처 재확인 필요'} · 작업 ${x.currentWorkId}: 중앙 AI 미등록 (승인·완료 아님)`]:[])]);n++}
+ else if(mode==='backlog'){
+  if(!Array.isArray(data.backlog)){card('중앙 백로그 미연결',['백로그 원본 등록부가 이 스냅샷에 포함되지 않았습니다. 등록 작업이 0개라는 의미가 아닙니다.']);n++}
+  else{
+   const order={P0:0,P1:1,P2:2};
+   const source=[...data.backlog].sort((a,b)=>(order[a.priority]??3)-(order[b.priority]??3)||a.id.localeCompare(b.id));
+   for(const x of source){
+    if(q&&![x.id,x.title,x.category,x.status,...x.dependencies].join(' ').toLocaleLowerCase().includes(q))continue;
+    if(st&&x.status!==st&&!(st==='IN_PROGRESS'&&x.status==='IMPLEMENTING')&&!(st==='OPEN'&&x.status==='NOT_STARTED'))continue;
+    const waiting=x.unresolvedDependencies.length?x.unresolvedDependencies.join(' → '):'등록된 선행 작업 미검증 상태는 없음';
+    card(x.priority+' · '+x.id+' · '+x.title,[
+     '원본 등록 상태 '+x.status+' · 단계 '+x.phase+' · 분야 '+x.category,
+     '선행 작업 '+(x.dependencies.length?x.dependencies.join(' → '):'없음')+' · 선행 상태 검토 '+waiting,
+     '등록부 외 선행조건 '+x.externalDependencyCount+'건 · 승인 필요 '+(x.approvalRequired?'있음':'등록상 없음'),
+     '증거 참조 '+x.evidenceReferenceCount+'건 · 원본·실행 결과·독립 검증은 별도',
+     '진행률 검증 근거 없음 · 자동 실행·완료·승인으로 해석 금지'
+    ]);n++;
+   }
+   if(n===0){card('필터에 맞는 작업 없음',['백로그 '+data.backlog.length+'건에서 일치 항목이 없습니다. 상태·검색조건을 바꿔 보세요.']);n++}
+  }
+ }
  else if(mode==='work'){
   for(const x of data.work){if(st&&x.status!==st)continue;if(q&&![x.id,x.title,x.project,x.executor,x.status].join(' ').toLocaleLowerCase().includes(q))continue;const c=card(x.title,[`${x.project} / ${x.executor} / 검토자 ${x.reviewer}`,`상태 ${label[x.status]||x.status} · 영수증 ${x.receiptCount} · 산출물 ${x.outputCount}`,`최근 기록 ${x.lastReceipt||'없음'} · 독립 검증 ${x.verified?'증거 확인':'미확인'}`]);el(c,'code',x.id);n++}
   if(!st)for(const x of data.projects){if(x.currentWorkRegistration!=='CURRENT_DECLARED_UNREGISTERED'||!x.currentWorkId)continue;

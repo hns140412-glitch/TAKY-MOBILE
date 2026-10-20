@@ -26,6 +26,9 @@ test('admin cookie gates progress and whitelists fields',async()=>{
    runtimeVersion:164,preflightReceipts:8,executionCallReceipts:5,actualInvocationReceipts:3,
    returnedReceipts:2,failedReceipts:1,outcomeUnknownReceipts:2,registeredRouteRecoveries:1,
    doneGateRecords:1,exactWorkLinks:0,rawModelOutput:'NEVER_LEAK_RAW_MODEL_OUTPUT'};
+ fixture.backlog=[{id:'CLN-002',title:'Private D:/internal/PRIVATE_BACKLOG_TITLE',category:'POST_CLEANUP',priority:'P0',status:'IMPLEMENTING',phase:'AFTER_CLEANUP',
+  dependencies:['CLN-001','../../escape'],unresolvedDependencies:['CLN-001'],externalDependencyCount:2,
+  evidenceReferenceCount:8,approvalRequired:false,outcomeVerifiedByIndependentReview:true,progressPercentVerified:100}];
  fixture.work[0].kernelExact={relation:'NO_EXACT_TASK_ID_MATCH',secret:'NEVER_LEAK_WORK_SECRET'};
  fixture.work[0].preparedSourceState='PREPARED_SOURCE_AND_HEAD_DRIFT_HOLD';
  fixture.work[0].preparedTaskPrivatePath='F:/PRIVATE_TASK_LOCATION_DO_NOT_LEAK';
@@ -76,6 +79,11 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(data.work[0].kernelExact.relation,'NO_EXACT_TASK_ID_MATCH');
  assert.equal(data.work[0].preparedSourceState,'PREPARED_SOURCE_AND_HEAD_DRIFT_HOLD');
  assert.equal(txt.includes('PRIVATE_TASK_LOCATION_DO_NOT_LEAK'),false);
+ assert.equal(data.backlog[0].title,'PRIVATE_TEXT_REDACTED');
+ assert.deepEqual(data.backlog[0].dependencies,['CLN-001']);
+ assert.equal(data.backlog[0].outcomeVerifiedByIndependentReview,false);
+ assert.equal(data.backlog[0].progressPercentVerified,null);
+ assert.equal(txt.includes('PRIVATE_BACKLOG_TITLE'),false);
  assert.equal(data.kernel.integrity,'HMAC_AND_ROLLBACK_ANCHOR_VERIFIED');
  assert.equal(data.kernel.actualInvocationReceipts,3);
  assert.equal(data.kernel.returnedReceipts,2);assert.equal(data.kernel.doneGateRecords,1);
@@ -152,5 +160,8 @@ test('actual local Workbench snapshot stays sanitized through the admin endpoint
  assert.equal(archi.currentWorkRegistration,'CURRENT_DECLARED_REGISTERED');
  assert.equal(archi.currentWorkPendingGates,7);
  assert.equal(archi.currentWorkVerified,false);
+ assert.equal(data.backlog.length,source.backlog.length);
+ assert.equal(data.backlog.find(x=>x.id==='CLN-002').status,'IMPLEMENTING');
+ assert.equal(data.backlog.find(x=>x.id==='CLN-002').outcomeVerifiedByIndependentReview,false);
  assert.equal(body.includes('why'),false);
 });

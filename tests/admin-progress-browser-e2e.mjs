@@ -23,6 +23,11 @@ let fixture={ok:true,schema:'TAKY_MOBILE_ADMIN_PROGRESS_SNAPSHOT_V1',generatedAt
 fixture.work[0].kernelExact={relation:'EXACT_REGISTERED_TASK_ID',preflightCount:1,invokedCount:1,unknownCount:0,routeRecoveryCount:1};
 fixture.work[0].preparedSourceState='PREPARED_SOURCE_AND_HEAD_DRIFT_HOLD';
 fixture.projects[0].currentProjectionShaMatched=true;
+fixture.backlog=[
+ {id:'CLN-001',title:'Source cleanup',priority:'P0',status:'IMPLEMENTING',phase:'AFTER_CLEANUP',category:'POST_CLEANUP',dependencies:[],unresolvedDependencies:[],approvalRequired:false,externalDependencyCount:1,evidenceReferenceCount:3},
+ {id:'CLN-002',title:'Join exact work source',priority:'P0',status:'IMPLEMENTING',phase:'AFTER_CLEANUP',category:'POST_CLEANUP',dependencies:['CLN-001'],unresolvedDependencies:['CLN-001'],approvalRequired:false,externalDependencyCount:0,evidenceReferenceCount:2},
+ {id:'UPD-001',title:'Publisher gate',priority:'P0',status:'BLOCKED',phase:'GATE',category:'INTEGRATION',dependencies:[],unresolvedDependencies:[],approvalRequired:true,externalDependencyCount:0,evidenceReferenceCount:1}
+];
 fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
 fixture.counts.headModifiedReachableSources=2;
 fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
@@ -159,6 +164,14 @@ try{
      assert.match(projectEvidence,/작업 배정 아님/);
      await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption(primary.id);
    }
+   await page.locator('#adminProgress .admin-switch button').filter({hasText:'전체 작업·선행조건'}).click();
+   const backlogUi=await page.locator('#adminProgress').innerText();
+   assert.ok(backlogUi.includes('CLN-002'),'existing backlog task ID must be shown');
+   assert.match(backlogUi,/선행 작업/);
+   assert.match(backlogUi,/진행률 검증 근거 없음/);
+   assert.match(backlogUi,/승인 필요/);
+   assert.equal(await page.locator('#adminProgress .admin-progress-card').count(),fixture.backlog.length,'all authoritative existing backlog items must be present');
+   await page.locator('#adminProgress .admin-switch button').filter({hasText:'오케스트라 흐름'}).click();
    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
    assert.ok(overflow<=0,'admin lineage causes horizontal overflow: '+overflow);
    const undersized=await page.locator('#adminProgress .admin-switch button').evaluateAll(nodes=>nodes.filter(n=>n.getBoundingClientRect().height<44).length);

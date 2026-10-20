@@ -22,6 +22,8 @@ export default async request=>{
  const entry=['HTML_ENTRYPOINT_DIFFERS_FROM_HEAD','HTML_ENTRYPOINT_MATCHES_HEAD','NO_WORKTREE_HTML_ENTRYPOINT','HTML_ENTRYPOINT_NOT_VERSIONED','HEAD_COMPARISON_UNAVAILABLE','REPOSITORY_UNAVAILABLE'];
  return respond({ok:true,schema:d.schema,generatedAt:s(d.generatedAt,45),
  counts:{projects:num(d.counts?.projects),work:num(d.counts?.work),open:num(d.counts?.open),review:num(d.counts?.review),blocked:num(d.counts?.blocked),verified:num(d.counts?.verified),
+  backlogTasks:num(d.counts?.backlogTasks),backlogP0Unverified:num(d.counts?.backlogP0Unverified),
+  backlogApprovalRequired:num(d.counts?.backlogApprovalRequired),
   sourceHeadGuardStatus:safeEnum(d.counts?.sourceHeadGuardStatus,headStatus),
   headModifiedReachableSources:num(d.counts?.headModifiedReachableSources)},
  coverage:{historicalChats:num(d.coverage?.historicalChats),octoberNativeChats:num(d.coverage?.octoberNativeChats),claim:'ACCOUNT_HISTORY_NOT_COMPLETE'},
@@ -84,6 +86,19 @@ export default async request=>{
    registeredRouteRecoveries:num(d.kernel.registeredRouteRecoveries),signedWorkLinks:num(d.kernel.signedWorkLinks),
    doneGateRecords:num(d.kernel.doneGateRecords),exactWorkLinks:num(d.kernel.exactWorkLinks)
  }:null,
+ backlog:Array.isArray(d.backlog)&&d.backlog.length<=100?d.backlog.map(x=>({
+   id:/^[A-Za-z0-9_-]{3,90}$/.test(x.id||'')?x.id:'INVALID_ID',
+   title:s(x.title,140),
+   category:s(x.category,50),
+   priority:['P0','P1','P2'].includes(x.priority)?x.priority:'UNKNOWN',
+   status:['IMPLEMENTING','NOT_STARTED','BLOCKED','VERIFIED','REJECTED'].includes(x.status)?x.status:'UNKNOWN',
+   phase:s(x.phase,60),approvalRequired:x.approvalRequired===true,
+   dependencies:Array.isArray(x.dependencies)?x.dependencies.filter(v=>typeof v==='string'&&/^[A-Za-z0-9_-]{3,90}$/.test(v)).slice(0,30):[],
+   unresolvedDependencies:Array.isArray(x.unresolvedDependencies)?x.unresolvedDependencies.filter(v=>typeof v==='string'&&/^[A-Za-z0-9_-]{3,90}$/.test(v)).slice(0,30):[],
+   externalDependencyCount:num(x.externalDependencyCount),evidenceReferenceCount:num(x.evidenceReferenceCount),
+   outcomeVerifiedByIndependentReview:false,progressPercentVerified:null,
+   authority:'BACKLOG_REGISTER_SOURCE_ONLY'
+ })):null,
  projects:d.projects.map(x=>({id:s(x.id,50),signal:s(x.signal,75),registered:s(x.registered,40),current:s(x.current,40),workCount:num(x.workCount),historicalChats:num(x.historicalChats),relayCandidates:num(x.relayCandidates),latestCodeAt:s(x.latestCodeAt,45),currentProjectionShaMatched:x.currentProjectionShaMatched===true,
    currentWorkId:/^[A-Za-z0-9_-]{3,90}$/.test(x.currentWorkId||'')?s(x.currentWorkId,90):'',
    currentWorkRegistration:['CURRENT_DECLARED_UNREGISTERED','CURRENT_DECLARED_REGISTERED','NO_CURRENT_WORK_ID'].includes(x.currentWorkRegistration)?x.currentWorkRegistration:'NO_CURRENT_WORK_ID',
