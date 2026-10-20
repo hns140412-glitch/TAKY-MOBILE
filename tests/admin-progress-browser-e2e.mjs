@@ -127,6 +127,15 @@ try{
      assert.match(flow,/연결된 AI 작업 증거 없음/,'unlinked snapshots must not invent a task graph');
    }
    if(fixture.projects.length>1){
+     const declared=fixture.projects.find(p=>p.currentWorkRegistration==='CURRENT_DECLARED_REGISTERED'&&p.currentWorkId);
+     if(declared){
+       await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption(declared.id);
+       const text=await page.locator('#adminProgress').innerText();
+       assert.match(text,/기존 백로그에 등록됨/);
+       assert.ok(text.includes(declared.currentWorkId),'exact pre-existing CURRENT ID should be visible, not a newly invented task');
+       assert.match(text,/AI 실행 연결·산출물·독립검증 별도 확인/);
+       await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption(primary.id);
+     }
      const target=fixture.projects.find(p=>!fixture.work.some(w=>w.project===p.id));
      if(target){
        await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption(target.id);

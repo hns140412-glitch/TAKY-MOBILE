@@ -86,6 +86,13 @@ export function renderAdminProgress(host,data){
        `HEAD 진입파일: ${project.headEntrypointIntegrity||'미검증'} · ${sourceLabel[project.headSourceParity]||'근거 미연결'} · 변경된 참조 소스 ${project.headSourceDriftCount??'미확인'}개`,
        `원본 연결: 작업 ID 등록 ${project.currentWorkIdRegistered?'있음':'없거나 미확인'} · 원자료 참조 ${project.sourceReferenceCount??'미기록'}건 · 산출물 참조 ${project.outputReferenceCount??'미기록'}건 · 보류 조건 ${project.pendingGateCount??'미기록'}건`,
        '위 소스 및 참조 숫자는 작업 완료·독립 QA·승인 증거가 아닙니다.']);n++;
+     if(project.currentWorkId&&project.currentWorkRegistration==='CURRENT_DECLARED_REGISTERED'){
+       card('PROJECT CURRENT 작업 ID · 기존 백로그에 등록됨 (실행·승인 별개)',[
+         'WORK_ID '+project.currentWorkId+' · 원본 참조 내용·최상위 CURRENT 승인 검증과 별개',
+         '미해결 게이트 '+(project.currentWorkPendingGates??'미확인')+'건 · AI 실행 연결·산출물·독립검증 별도 확인',
+         '기존 작업 ID가 존재한다는 것만 확인했습니다. 완료나 새 작업 발행이 아닙니다.'
+       ]);n++;
+     }
      if(project.currentWorkId&&project.currentWorkRegistration==='CURRENT_DECLARED_UNREGISTERED'){
        card(project.currentWorkSourceVerified===true?'PROJECT CURRENT 작업 · 중앙 AI 등록부 미연결':'과거 CURRENT 투영 · 출처 재확인 필요',[
          `PROJECT CURRENT 기록 작업 ID: ${project.currentWorkId} · 원본 SHA: ${project.currentWorkSourceVerified===true?'일치':'불일치 또는 미확인'}`,
