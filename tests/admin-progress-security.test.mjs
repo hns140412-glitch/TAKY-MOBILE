@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import fs from 'node:fs';
+import {readLatestLocalAdminFixture} from './local-workbench-admin-snapshot.mjs';
 import login from '../netlify/functions/admin-session.mjs';
 import progress from '../netlify/functions/admin-progress.mjs';
 const base='https://taky-mobile.netlify.app/.netlify/functions/';
@@ -40,6 +41,8 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  fixture.projects[0].localTrackedWipObserved=true;
  fixture.projects[0].workRegistrationGap=true;
  fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
+ fixture.modelLane={status:'SIGNED_RUNTIME_READ_ONLY',activeEntries:26,pendingNeverClaimed:2,unknownOutcome:4,callingOrClaimed:0,heldReviewScopes:2,independentReviewRouteHeld:true,
+  secret:'MODEL_RUNTIME_HMAC_SHOULD_NOT_LEAK',releaseAutomatically:true,newCallsAuthorized:true};
  fixture.counts.headModifiedReachableSources=62;
  fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
  fixture.projects[0].recoveryNextAction='BIND_EXACT_WORK_ID_AND_REPRODUCIBLE_CONSUMER_QA_BEFORE_CURRENT_CHANGE';
@@ -96,6 +99,12 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(data.projects[0].localTrackedWipObserved,true);
  assert.equal(data.projects[0].workRegistrationGap,true);
  assert.equal(data.counts.sourceHeadGuardStatus,'WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD');
+ assert.equal(data.modelLane.pendingNeverClaimed,2);
+ assert.equal(data.modelLane.unknownOutcome,4);
+ assert.equal(data.modelLane.independentReviewRouteHeld,true);
+ assert.equal(data.modelLane.releaseAutomatically,false);
+ assert.equal(data.modelLane.newCallsAuthorized,false);
+ assert.equal(txt.includes('MODEL_RUNTIME_HMAC_SHOULD_NOT_LEAK'),false);
  assert.equal(data.counts.headModifiedReachableSources,62);
  assert.equal(data.projects[0].observedRecoveryState,'LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED');
  assert.equal(data.projects[0].headEntrypointIntegrity,'HTML_ENTRYPOINT_DIFFERS_FROM_HEAD');
@@ -139,8 +148,10 @@ test('admin cookie gates progress and whitelists fields',async()=>{
 
 test('actual local Workbench snapshot stays sanitized through the admin endpoint',
  {skip:process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT!=='1'},async()=>{
- const raw=fs.readFileSync('artifacts/admin-progress-local-only.json','utf8');
- const source=JSON.parse(raw);
+ const latest=readLatestLocalAdminFixture();
+ const source=latest.payload;
+ const raw=JSON.stringify(source);
+ assert.ok(latest.adminHash,'latest local snapshot must be SHA-verified');
  assert.equal(source.projects.length,9);
  assert.ok(source.qa&&source.qa.openGaps>0);
  process.env.TAKY_ADMIN_ACCESS_KEY='local-fixture-admin';

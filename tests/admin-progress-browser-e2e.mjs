@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readLatestLocalAdminFixture} from './local-workbench-admin-snapshot.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +30,7 @@ fixture.backlog=[
  {id:'UPD-001',title:'Publisher gate',priority:'P0',status:'BLOCKED',phase:'GATE',category:'INTEGRATION',dependencies:[],unresolvedDependencies:[],approvalRequired:true,externalDependencyCount:0,evidenceReferenceCount:1}
 ];
 fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
+fixture.modelLane={status:'SIGNED_RUNTIME_READ_ONLY',activeEntries:26,pendingNeverClaimed:2,unknownOutcome:4,callingOrClaimed:0,heldReviewScopes:2,independentReviewRouteHeld:true};
 fixture.counts.headModifiedReachableSources=2;
 fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
 fixture.projects[0].headEntrypointIntegrity='HTML_ENTRYPOINT_DIFFERS_FROM_HEAD';
@@ -41,9 +43,10 @@ fixture.projects[0].pendingGateCount=0;
 fixture.lineage={authority:'DERIVED_VIEW_ONLY_NOT_GLOBAL_CURRENT',nativeChatCount:0,topicCount:0,projectCurrentProjectionHashMatches:1,projectCount:1,exactWorkKernelLinks:1};
 fixture.kernel={source:'TAKY2_RUNTIME_READ_ONLY_NON_CANONICAL',observedFileModifiedAt:'2026-10-18T01:00:00Z',runtimeVersion:1,preflightReceipts:1,executionCallReceipts:1,actualInvocationReceipts:1,returnedReceipts:1,outcomeUnknownReceipts:0,failedReceipts:0,registeredRouteRecoveries:1,doneGateRecords:1,exactWorkLinks:1};
 if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'){
- const f=process.env.TAKY_ADMIN_E2E_SNAPSHOT_FILE||path.join(ROOT,'artifacts','admin-progress-local-only.json');
- assert.ok(fs.existsSync(f),'actual local snapshot missing');
- const source=JSON.parse(fs.readFileSync(f,'utf8'));
+ const latest=readLatestLocalAdminFixture();
+ const source=latest.payload;
+ assert.ok(latest.adminHash&&latest.snapshot,'actual local snapshot and pointer must be SHA-verified');
+ assert.equal(source.modelLane?.status,'SIGNED_RUNTIME_READ_ONLY','signed model execution holds must be visible in the current source');
  fixture={ok:true,...source,work:source.work.map(w=>({
    ...w,classificationAvailable:w.evidenceState==='DERIVED_RECORD_NOT_INDEPENDENT_EXECUTION_PROOF'
  }))};
@@ -89,6 +92,9 @@ try{
    assert.equal(await page.locator('#adminProgress .admin-lineage-node').count(),6*linked.length,'six evidence stages per explicitly linked work');
    const flow=await page.locator('#adminProgress').innerText();
    assert.match(flow,/HEAD 재현성 검사/,'admin must display worktree-vs-HEAD hold');
+   assert.match(flow,/서명 검증 TAKY2 실행 대기 2건/);
+   assert.match(flow,/독립 검토 경로 HOLD/);
+   assert.match(flow,/호출 결과 불명 4건/);
    if(primary.headSourceParity==='SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM'){
      assert.match(flow,/현재 앱 소스와 Git HEAD 불일치/);
      assert.match(flow,/코드 활동은 개발 완료 증명 아님/);

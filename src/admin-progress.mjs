@@ -56,6 +56,13 @@ export function renderAdminProgress(host,data){
   const drift=Number.isSafeInteger(data.counts.headModifiedReachableSources)?data.counts.headModifiedReachableSources:'근거 없음';
   el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개 · 제품 복원 인증 아님','admin-caption');
  }
+ if(data.modelLane){
+  const m=data.modelLane;
+  const info=m.status==='SIGNED_RUNTIME_READ_ONLY'
+    ?'서명 검증 TAKY2 실행 대기 '+m.pendingNeverClaimed+'건 · 호출 결과 불명 '+m.unknownOutcome+'건 · 독립 검토 경로 '+(m.independentReviewRouteHeld?'HOLD':'대기 기록 미확인')+' · 모델 호출/완료 증명 아님'
+    :'TAKY2 서명 상태 확인 불가 ('+m.status+') · 기존 작업 상태 유지';
+  el(host,'p',info,'admin-caption');
+ }
  const metrics=el(host,'div','','admin-metrics');
  for(const [k,v] of [['프로젝트',data.counts.projects],['AI 작업',data.counts.work],['검토 대기',data.counts.review],['차단 기록',data.counts.blocked],['독립 검증 표시',data.counts.verified],...(Array.isArray(data.backlog)?[['백로그 작업',data.backlog.length]]:[]),...(data.qa?[['QA 실패',data.qa.failed],['QA P0 공백',data.qa.gaps.filter(g=>g.priority==='P0').length]]:[])]){const c=el(metrics,'div','','admin-metric');el(c,'small',k);el(c,'strong',v)}
  const tabs=el(host,'div','','admin-switch'),projectPick=el(host,'select','','admin-search'),search=el(host,'input','','admin-search'),filter=el(host,'select','','admin-search'),results=el(host,'div','','admin-progress-results'),count=el(host,'p','','admin-caption');

@@ -86,6 +86,16 @@ export default async request=>{
    registeredRouteRecoveries:num(d.kernel.registeredRouteRecoveries),signedWorkLinks:num(d.kernel.signedWorkLinks),
    doneGateRecords:num(d.kernel.doneGateRecords),exactWorkLinks:num(d.kernel.exactWorkLinks)
  }:null,
+ modelLane:d.modelLane&&typeof d.modelLane==='object'?{
+   status:['SIGNED_RUNTIME_READ_ONLY','NOT_AVAILABLE','SIGNED_STATE_PROOF_UNAVAILABLE','SIGNED_RUNTIME_HOLD'].includes(d.modelLane.status)?d.modelLane.status:'UNVERIFIED',
+   activeEntries:d.modelLane.activeEntries==null?null:num(d.modelLane.activeEntries),
+   pendingNeverClaimed:d.modelLane.pendingNeverClaimed==null?null:num(d.modelLane.pendingNeverClaimed),
+   unknownOutcome:d.modelLane.unknownOutcome==null?null:num(d.modelLane.unknownOutcome),
+   callingOrClaimed:d.modelLane.callingOrClaimed==null?null:num(d.modelLane.callingOrClaimed),
+   independentReviewRouteHeld:d.modelLane.independentReviewRouteHeld===true?true:d.modelLane.independentReviewRouteHeld===false?false:null,
+   heldReviewScopes:num(d.modelLane.heldReviewScopes),
+   releaseAutomatically:false,markModelCallsCompleted:false,newCallsAuthorized:false
+  }:null,
  backlog:Array.isArray(d.backlog)&&d.backlog.length<=100?d.backlog.map(x=>({
    id:/^[A-Za-z0-9_-]{3,90}$/.test(x.id||'')?x.id:'INVALID_ID',
    title:s(x.title,140),
