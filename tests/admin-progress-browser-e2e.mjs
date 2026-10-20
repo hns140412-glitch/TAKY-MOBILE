@@ -43,6 +43,7 @@ if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'){
    ...w,classificationAvailable:w.evidenceState==='DERIVED_RECORD_NOT_INDEPENDENT_EXECUTION_PROOF'
  }))};
  assert.equal(fixture.counts.projects,9);
+ assert.ok(fixture.qa?.openGaps>0,'actual snapshot must contain unresolved QA evidence');
 }
 let browser;
 try{
@@ -222,5 +223,5 @@ try{
    await context.close();
  }
  assert.equal(preAuthDataCalls,0,'client never requests admin data before admin auth');
- console.log(JSON.stringify({contract:'TAKY_MOBILE_ADMIN_PROGRESS_E2E_V1',mobile:true,desktop:true,publicIsolation:true,login:true,logout:true,progress:true,preAuthDataCalls}));
+ console.log(JSON.stringify({contract:'TAKY_MOBILE_ADMIN_PROGRESS_E2E_V1',mobile:true,desktop:true,publicIsolation:true,login:true,logout:true,progress:true,preAuthDataCalls,realLocalSnapshotUsed:process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1',qaOpenGaps:fixture.qa?.openGaps??null}));
 }finally{await browser?.close();await new Promise(r=>server.close(r))}

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import fs from 'node:fs';
 import login from '../netlify/functions/admin-session.mjs';
 import progress from '../netlify/functions/admin-progress.mjs';
 const base='https://taky-mobile.netlify.app/.netlify/functions/';
@@ -126,4 +127,30 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  process.env.TAKY_ADMIN_PROGRESS_JSON=trustedSnapshot;
  const logout=await login(request('admin-session','DELETE',{o:origin,cookie}));
  assert.equal(logout.status,200);assert.match(logout.headers.get('set-cookie'),/Max-Age=0/);
+});
+
+test('actual local Workbench snapshot stays sanitized through the admin endpoint',
+ {skip:process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT!=='1'},async()=>{
+ const raw=fs.readFileSync('artifacts/admin-progress-local-only.json','utf8');
+ const source=JSON.parse(raw);
+ assert.equal(source.projects.length,9);
+ assert.ok(source.qa&&source.qa.openGaps>0);
+ process.env.TAKY_ADMIN_ACCESS_KEY='local-fixture-admin';
+ process.env.TAKY_ADMIN_SESSION_SECRET='local-fixture-sign';
+ process.env.TAKY_ADMIN_PROGRESS_JSON=raw;
+ const signed=await login(request('admin-session','POST',{o:origin,body:{key:process.env.TAKY_ADMIN_ACCESS_KEY}}));
+ assert.equal(signed.status,200);
+ const cookie=signed.headers.get('set-cookie').split(';')[0];
+ const reply=await progress(request('admin-progress','GET',{cookie}));
+ assert.equal(reply.status,200);
+ const body=await reply.text(),data=JSON.parse(body);
+ assert.equal(data.qa.openGaps,source.qa.openGaps);
+ assert.equal(data.qa.passed,source.qa.passed);
+ assert.equal(data.qa.productionVerified,false);
+ const archi=data.projects.find(p=>p.id==='TAKY_ARCHI-GROW');
+ assert.equal(archi.currentWorkId,'MCP-REA-20261016');
+ assert.equal(archi.currentWorkRegistration,'CURRENT_DECLARED_REGISTERED');
+ assert.equal(archi.currentWorkPendingGates,7);
+ assert.equal(archi.currentWorkVerified,false);
+ assert.equal(body.includes('why'),false);
 });
