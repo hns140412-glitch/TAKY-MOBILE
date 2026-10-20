@@ -42,7 +42,16 @@ export function renderAdminProgress(host,data){
  el(host,'p',freshness,'admin-caption');
  const refresh=el(host,'button','관리자 스냅샷 다시 조회','quick');
  refresh.type='button';
- refresh.addEventListener('click',async()=>{refresh.disabled=true;const updated=await readAdminProgress();renderAdminProgress(host,updated)});
+ refresh.addEventListener('click',async()=>{
+   refresh.disabled=true;
+   const previous=data.generatedAt||'';
+   const updated=await readAdminProgress();
+   renderAdminProgress(host,updated);
+   if(updated.ok&&updated.generatedAt===previous){
+     const message=el(host,'p','서버 자료 생성 시각이 이전과 동일합니다. 새로고침은 로컬 PC 작업이나 서버 게시를 실행하지 않습니다.','admin-caption');
+     message.dataset.snapshotRefresh='unchanged';
+   }
+ });
  if(data.counts?.sourceHeadGuardStatus){
   const drift=Number.isSafeInteger(data.counts.headModifiedReachableSources)?data.counts.headModifiedReachableSources:'근거 없음';
   el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개 · 제품 복원 인증 아님','admin-caption');

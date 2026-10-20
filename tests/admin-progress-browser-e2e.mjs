@@ -187,7 +187,13 @@ try{
    await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
    await page.waitForFunction(()=>document.querySelector('#adminProgress')?.textContent?.includes('생성 후 24시간 초과'));
    assert.match(await page.locator('#adminProgress').innerText(),/실시간 실행 상태 아님|최신 실행 상태 미확인/);
+   await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
+   await page.locator('[data-snapshot-refresh="unchanged"]').waitFor({state:'visible'});
+   assert.match(await page.locator('#adminProgress').innerText(),/새로고침은 로컬 PC 작업이나 서버 게시를 실행하지 않습니다/);
    fixture={...fixture,generatedAt:savedGeneratedAt};
+   await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
+   await page.waitForFunction(v=>document.querySelector('#adminProgress')?.textContent?.includes(v),savedGeneratedAt);
+   assert.equal(await page.locator('[data-snapshot-refresh="unchanged"]').count(),0,'new server snapshot must clear stale refresh message');
    await page.locator('#adminProgress .admin-switch button').filter({hasText:'검증 단계'}).click();
    if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'&&fixture.pipeline){
      assert.ok(stagesText.includes(`개별 참조 ${fixture.pipeline.trustReferencesVerified||0}/${fixture.pipeline.trustReferencesTotal||0}`));
