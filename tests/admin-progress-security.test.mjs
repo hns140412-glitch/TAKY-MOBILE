@@ -44,6 +44,16 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  fixture.modelLane={status:'SIGNED_RUNTIME_READ_ONLY',activeEntries:26,pendingNeverClaimed:2,unknownOutcome:4,callingOrClaimed:0,heldReviewScopes:2,independentReviewRouteHeld:true,
   secret:'MODEL_RUNTIME_HMAC_SHOULD_NOT_LEAK',releaseAutomatically:true,newCallsAuthorized:true};
  fixture.counts.headModifiedReachableSources=62;
+ fixture.counts.runtimeAssetsChecked=289;
+ fixture.counts.runtimeAssetsMissing=0;
+ fixture.counts.runtimeAssetsUnversioned=66;
+ fixture.operator={
+  local_execution:{status:'REFRESHED_SHA_VERIFIED',observed_at:'2026-10-21T04:53:36Z',age_hours:0.25,stale:false,recent_actions:0,local_ready:0,dependency_wait:11,slice_state:'NO_NEW_LOCAL_DIAGNOSTIC_WORK',completion_verified:true,privatePath:'D:/private/operator'},
+  collector:{status:'FRESH_CANDIDATE_INCOMPLETE',observed_at:'2026-10-21T05:01:00Z',age_hours:0.1,stale:false,blockers:['UNEXTRACTED_RAW','LEARNING_NOT_INTEGRATED','D:/PRIVATE_COLLECTOR_PATH'],candidate_counts:{packets:48,pending_raw:34,visual_review:28,recovered_raw:4,batch_source_hash_matches:true},full_ten_stages_verified:true,token:'SECRET_NEVER_EMIT'}
+ };
+ fixture.projects[0].runtimeAssetsChecked=121;
+ fixture.projects[0].runtimeAssetsMissing=0;
+ fixture.projects[0].runtimeAssetsUnversioned=24;
  fixture.projects[0].observedRecoveryState='LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED';
  fixture.projects[0].recoveryNextAction='BIND_EXACT_WORK_ID_AND_REPRODUCIBLE_CONSUMER_QA_BEFORE_CURRENT_CHANGE';
  fixture.projects[0].headEntrypointIntegrity='HTML_ENTRYPOINT_DIFFERS_FROM_HEAD';
@@ -67,6 +77,16 @@ test('admin cookie gates progress and whitelists fields',async()=>{
    productionVerified:true,privateSource:'D:/private/qa/secret',
    gaps:[{id:'administrator-qa-consumption',area:'TAKY-MOBILE',priority:'P0',
            why:'PRIVATE_QA_REASON_DO_NOT_SEND'}]};
+ fixture.systemGates={schema:'TAKY_SYSTEM_GATE_DERIVED_V1',authority:'DERIVED_OBSERVER_ONLY_NOT_CURRENT',
+  state:'COMPLETE',completionVerified:true,canAutoPromote:true,
+  qaBasisMode:'deep',qaBasisFinishedAt:'2026-10-22T11:47:27Z',
+  private:'D:/PRIVATE_SYSTEM_ROOT',
+  gates:['CURRENT_AUTHORITY','WORK_ID_OWNERSHIP','AI_INDEPENDENT_REVIEW',
+    'HEAD_REPRODUCIBILITY','RAW_TO_FORMING','PRODUCT_RELEASE_QA'].map((id,i)=>({
+      id,state:'COMPLETE',verified:true,observedUnresolved:i===3?null:i+2,
+      secondaryUnresolved:i+3,tertiaryUnresolved:i===5?7:null,
+      private:'F:/PRIVATE_GATE_SECRET',nextCode:'PRIVATE_SECRET_COMMAND'
+    }))};
  process.env.TAKY_ADMIN_PROGRESS_JSON=JSON.stringify(fixture);
  const signin=await login(request('admin-session','POST',{o:origin,body:{key:process.env.TAKY_ADMIN_ACCESS_KEY}}));
  assert.equal(signin.status,200);
@@ -76,6 +96,20 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  const result=await progress(request('admin-progress','GET',{cookie}));
  assert.equal(result.status,200);
  const txt=await result.text(),data=JSON.parse(txt);
+ assert.equal(data.systemGates.state,'HOLD_NOT_RELEASE_VERIFIED');
+ assert.equal(data.systemGates.completionVerified,false);
+ assert.equal(data.systemGates.canAutoPromote,false);
+ assert.equal(data.systemGates.qaBasisMode,'deep');
+ assert.equal(data.systemGates.qaBasisFinishedAt,'2026-10-22T11:47:27Z');
+ assert.equal(data.systemGates.gates.length,6);
+ assert.ok(data.systemGates.gates.every(x=>x.state==='HOLD'&&x.verified===false));
+ assert.equal(data.systemGates.gates[3].observedUnresolved,null);
+ assert.equal(data.systemGates.gates[0].observedUnresolved,2);
+ assert.equal(data.systemGates.gates[0].secondaryUnresolved,3);
+ assert.equal(data.systemGates.gates[5].tertiaryUnresolved,7);
+ assert.equal(txt.includes('PRIVATE_SYSTEM_ROOT'),false);
+ assert.equal(txt.includes('PRIVATE_GATE_SECRET'),false);
+ assert.equal(txt.includes('PRIVATE_SECRET_COMMAND'),false);
  assert.equal(data.counts.projects,9);assert.equal(data.work[0].verified,false);
  assert.equal(data.work[0].preparedCount,1);assert.equal(data.work[0].callClaimCount,1);
  assert.equal(data.work[0].classificationAvailable,true);assert.equal(data.work[0].chatLinked,false);
@@ -106,6 +140,23 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(data.modelLane.newCallsAuthorized,false);
  assert.equal(txt.includes('MODEL_RUNTIME_HMAC_SHOULD_NOT_LEAK'),false);
  assert.equal(data.counts.headModifiedReachableSources,62);
+ assert.equal(data.counts.runtimeAssetsChecked,289);
+ assert.equal(data.counts.runtimeAssetsMissing,0);
+ assert.equal(data.counts.runtimeAssetsUnversioned,66);
+ assert.equal(data.operator.localExecution.dependencyWait,11);
+ assert.equal(data.operator.localExecution.recentActions,0);
+ assert.equal(data.operator.localExecution.completionVerified,false);
+ assert.equal(data.operator.collector.status,'FRESH_CANDIDATE_INCOMPLETE');
+ assert.equal(data.operator.collector.candidatePackets,48);
+ assert.equal(data.operator.collector.pendingRaw,34);
+ assert.equal(data.operator.collector.visualReview,28);
+ assert.equal(data.operator.collector.candidateSourceHashVerified,true);
+ assert.deepEqual(data.operator.collector.blockerCodes,['UNEXTRACTED_RAW','LEARNING_NOT_INTEGRATED']);
+ assert.equal(data.operator.collector.fullTenStagesVerified,false);
+ assert.equal(txt.includes('PRIVATE_COLLECTOR_PATH'),false);
+ assert.equal(txt.includes('SECRET_NEVER_EMIT'),false);
+ assert.equal(data.projects[0].runtimeAssetsChecked,121);
+ assert.equal(data.projects[0].runtimeAssetsUnversioned,24);
  assert.equal(data.projects[0].observedRecoveryState,'LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED');
  assert.equal(data.projects[0].headEntrypointIntegrity,'HTML_ENTRYPOINT_DIFFERS_FROM_HEAD');
  assert.equal(data.projects[0].headSourceParity,'SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM');
@@ -141,6 +192,19 @@ test('admin cookie gates progress and whitelists fields',async()=>{
    ...fixture,qa:{...fixture.qa,openGaps:999}});
  const inconsistent=await (await progress(request('admin-progress','GET',{cookie}))).json();
  assert.equal(inconsistent.qa,null);
+ process.env.TAKY_ADMIN_PROGRESS_JSON=JSON.stringify({...fixture,
+   counts:{...fixture.counts,runtimeAssetsUnversioned:-1},
+   operator:{...fixture.operator,
+     local_execution:{...fixture.operator.local_execution,dependency_wait:-1},
+     collector:{...fixture.operator.collector,status:'FAKE_VERIFIED',candidate_counts:{...fixture.operator.collector.candidate_counts,packets:-1}}},
+   projects:[{...fixture.projects[0],runtimeAssetsChecked:'288',runtimeAssetsUnversioned:-2}]});
+ const invalidAsset=await (await progress(request('admin-progress','GET',{cookie}))).json();
+ assert.equal(invalidAsset.counts.runtimeAssetsUnversioned,null);
+ assert.equal(invalidAsset.projects[0].runtimeAssetsChecked,null);
+ assert.equal(invalidAsset.projects[0].runtimeAssetsUnversioned,null);
+ assert.equal(invalidAsset.operator.localExecution.dependencyWait,null);
+ assert.equal(invalidAsset.operator.collector.status,'NOT_VERIFIED');
+ assert.equal(invalidAsset.operator.collector.candidatePackets,null);
  process.env.TAKY_ADMIN_PROGRESS_JSON=trustedSnapshot;
  const logout=await login(request('admin-session','DELETE',{o:origin,cookie}));
  assert.equal(logout.status,200);assert.match(logout.headers.get('set-cookie'),/Max-Age=0/);
@@ -174,5 +238,8 @@ test('actual local Workbench snapshot stays sanitized through the admin endpoint
  assert.equal(data.backlog.length,source.backlog.length);
  assert.equal(data.backlog.find(x=>x.id==='CLN-002').status,'IMPLEMENTING');
  assert.equal(data.backlog.find(x=>x.id==='CLN-002').outcomeVerifiedByIndependentReview,false);
+ assert.equal(data.counts.runtimeAssetsUnversioned,66);
+ assert.equal(data.counts.runtimeAssetsChecked,289);
+ assert.equal(data.projects.find(x=>x.id==='HIDE-SEEK').runtimeAssetsUnversioned,24);
  assert.equal(body.includes('why'),false);
 });

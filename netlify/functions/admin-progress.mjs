@@ -14,6 +14,7 @@ export default async request=>{
    return /(?:[A-Za-z]:[\\/]|\\\\[A-Za-z0-9_.-]+[\\/]|\/home\/|\/Users\/|Bearer\s+|(?:api[_-]?key|secret|password)\s*[:=])/i.test(value)
       ?'PRIVATE_TEXT_REDACTED':value;
  },num=x=>Number.isSafeInteger(x)&&x>=0?x:0,
+  nullableCount=x=>Number.isSafeInteger(x)&&x>=0?x:null,
   safeEnum=(x,values)=>values.includes(x)?x:'NOT_VERIFIED';
  const recoveryStates=['LOCAL_WIP_OBSERVED_CURRENT_IDLE_REVIEW_REQUIRED','NAMED_CANDIDATE_WITH_LOCAL_WIP_CONSUMER_QA_REQUIRED','CONFLICT_HOLD','SOURCE_UNAVAILABLE_HOLD','LOCAL_WORK_REVIEW_REQUIRED','NO_LOCAL_GIT_CHANGES_OBSERVED'];
  const recoveryActions=['BIND_EXACT_WORK_ID_AND_REPRODUCIBLE_CONSUMER_QA_BEFORE_CURRENT_CHANGE','VERIFY_REFERENCED_INPUT_REVISION_AND_PENDING_USER_GATES','RESTORE_OR_VERIFY_ORIGINAL_REPOSITORY_BEFORE_CLAIMS','ISOLATE_CONFLICT_AND_VERIFY_WITH_OWNER','ASSIGN_EXACT_WORK_ID_AND_VERIFY_OUTCOME','INSPECT_EXISTING_RECEIPTS_BEFORE_STATUS_CHANGE'];
@@ -25,7 +26,10 @@ export default async request=>{
   backlogTasks:num(d.counts?.backlogTasks),backlogP0Unverified:num(d.counts?.backlogP0Unverified),
   backlogApprovalRequired:num(d.counts?.backlogApprovalRequired),
   sourceHeadGuardStatus:safeEnum(d.counts?.sourceHeadGuardStatus,headStatus),
-  headModifiedReachableSources:num(d.counts?.headModifiedReachableSources)},
+  headModifiedReachableSources:num(d.counts?.headModifiedReachableSources),
+  runtimeAssetsChecked:nullableCount(d.counts?.runtimeAssetsChecked),
+  runtimeAssetsMissing:nullableCount(d.counts?.runtimeAssetsMissing),
+  runtimeAssetsUnversioned:nullableCount(d.counts?.runtimeAssetsUnversioned)},
  coverage:{historicalChats:num(d.coverage?.historicalChats),octoberNativeChats:num(d.coverage?.octoberNativeChats),claim:'ACCOUNT_HISTORY_NOT_COMPLETE'},
  pipeline:d.pipeline&&typeof d.pipeline==='object'?{
    notionTotal:num(d.pipeline.notionTotal),notionTextStaged:num(d.pipeline.notionTextStaged),
@@ -86,6 +90,40 @@ export default async request=>{
    registeredRouteRecoveries:num(d.kernel.registeredRouteRecoveries),signedWorkLinks:num(d.kernel.signedWorkLinks),
    doneGateRecords:num(d.kernel.doneGateRecords),exactWorkLinks:num(d.kernel.exactWorkLinks)
  }:null,
+ operator:d.operator&&typeof d.operator==='object'?{
+   localExecution:{
+     status:safeEnum(d.operator.local_execution?.status,
+       ['REFRESHED_SHA_VERIFIED','SKIPPED_ALREADY_RUNNING','LOCAL_EXECUTOR_TIMEOUT_HOLD','EXPORTER_TIMEOUT_HOLD','EXPORTER_NONZERO_HOLD','RECONCILE_VALIDATION_HOLD','NO_STATUS_EVIDENCE']),
+     observedAt:s(d.operator.local_execution?.observed_at,45),
+     ageHours:Number.isFinite(d.operator.local_execution?.age_hours)&&d.operator.local_execution.age_hours>=0?d.operator.local_execution.age_hours:null,
+     stale:d.operator.local_execution?.stale!==false,
+     recentActions:nullableCount(d.operator.local_execution?.recent_actions),
+     localReady:nullableCount(d.operator.local_execution?.local_ready),
+     dependencyWait:nullableCount(d.operator.local_execution?.dependency_wait),
+     sliceState:safeEnum(d.operator.local_execution?.slice_state,
+       ['NO_NEW_LOCAL_DIAGNOSTIC_WORK','LOCAL_DIAGNOSTIC_ACTIONS_ATTEMPTED','LOCAL_EXECUTOR_TIMEOUT_HOLD','LOCAL_EXECUTOR_GUARD_HOLD','UNVERIFIED']),
+     completionVerified:false},
+   collector:{
+     status:safeEnum(d.operator.collector?.status,
+       ['STALE_EVIDENCE_REBUILD_REQUIRED','FRESH_CANDIDATE_INCOMPLETE','INTEGRITY_ONLY_LIVE_E2E_REQUIRED','HOLD_INVALID_POINTER_RECEIPT','HOLD_INTEGRITY_FAILURE','HOLD_MISSING_POINTER','HOLD_UNVERIFIED','HOLD_UNSAFE_RECEIPT_PATH','NO_STATUS_EVIDENCE']),
+     observedAt:s(d.operator.collector?.observed_at,45),
+     ageHours:Number.isFinite(d.operator.collector?.age_hours)&&d.operator.collector.age_hours>=0?d.operator.collector.age_hours:null,
+     stale:d.operator.collector?.stale!==false,
+     blockerCodes:Array.isArray(d.operator.collector?.blockers)?
+       d.operator.collector.blockers.filter(v=>[
+         'CURRENT_NOTION_DIFFERS_FROM_TEN_STAGE_RECEIPT','LEARNING_NOT_INTEGRATED',
+         'NON_AUTHORITATIVE_CANDIDATE','PRODUCTION_NOT_RELEASED',
+         'SIEZEALL_REMOTE_INBOX_POLL_NOT_VERIFIED','UNEXTRACTED_RAW',
+         'WORK_OS_ARCHIVE_RECURSIVE_READBACK_OPEN',
+         'CURRENT_INVENTORY_DIFFERS_FROM_TEN_STAGE_RECEIPT'
+       ].includes(v)).slice(0,20):[],
+     candidatePackets:nullableCount(d.operator.collector?.candidate_counts?.packets),
+     pendingRaw:nullableCount(d.operator.collector?.candidate_counts?.pending_raw),
+     visualReview:nullableCount(d.operator.collector?.candidate_counts?.visual_review),
+     recoveredRaw:nullableCount(d.operator.collector?.candidate_counts?.recovered_raw),
+     candidateSourceHashVerified:d.operator.collector?.candidate_counts?.batch_source_hash_matches===true,
+     fullTenStagesVerified:false}
+  }:null,
  modelLane:d.modelLane&&typeof d.modelLane==='object'?{
    status:['SIGNED_RUNTIME_READ_ONLY','NOT_AVAILABLE','SIGNED_STATE_PROOF_UNAVAILABLE','SIGNED_RUNTIME_HOLD'].includes(d.modelLane.status)?d.modelLane.status:'UNVERIFIED',
    activeEntries:d.modelLane.activeEntries==null?null:num(d.modelLane.activeEntries),
@@ -95,6 +133,25 @@ export default async request=>{
    independentReviewRouteHeld:d.modelLane.independentReviewRouteHeld===true?true:d.modelLane.independentReviewRouteHeld===false?false:null,
    heldReviewScopes:num(d.modelLane.heldReviewScopes),
    releaseAutomatically:false,markModelCallsCompleted:false,newCallsAuthorized:false
+  }:null,
+ systemGates:d.systemGates?.schema==='TAKY_SYSTEM_GATE_DERIVED_V1'&&
+   d.systemGates?.authority==='DERIVED_OBSERVER_ONLY_NOT_CURRENT'&&
+   Array.isArray(d.systemGates.gates)&&d.systemGates.gates.length===6&&
+   d.systemGates.gates.every((g,i)=>g?.id===[
+     'CURRENT_AUTHORITY','WORK_ID_OWNERSHIP','AI_INDEPENDENT_REVIEW',
+     'HEAD_REPRODUCIBILITY','RAW_TO_FORMING','PRODUCT_RELEASE_QA'][i])?{
+   schema:'TAKY_SYSTEM_GATE_DERIVED_V1',state:'HOLD_NOT_RELEASE_VERIFIED',
+   completionVerified:false,canAutoPromote:false,
+   qaBasisMode:['quick','deep'].includes(d.systemGates.qaBasisMode)?d.systemGates.qaBasisMode:null,
+   qaBasisFinishedAt:s(d.systemGates.qaBasisFinishedAt,45),
+   gates:d.systemGates.gates.map((g,i)=>({
+     id:['CURRENT_AUTHORITY','WORK_ID_OWNERSHIP','AI_INDEPENDENT_REVIEW',
+         'HEAD_REPRODUCIBILITY','RAW_TO_FORMING','PRODUCT_RELEASE_QA'][i],
+     state:'HOLD',verified:false,
+     observedUnresolved:nullableCount(g.observedUnresolved),
+     secondaryUnresolved:nullableCount(g.secondaryUnresolved),
+     tertiaryUnresolved:nullableCount(g.tertiaryUnresolved)
+   }))
   }:null,
  backlog:Array.isArray(d.backlog)&&d.backlog.length<=100?d.backlog.map(x=>({
    id:/^[A-Za-z0-9_-]{3,90}$/.test(x.id||'')?x.id:'INVALID_ID',
@@ -123,6 +180,9 @@ export default async request=>{
    headSourceDriftCount:x.headSourceDriftCount==null?null:num(x.headSourceDriftCount),
    headSourceMissingCount:x.headSourceMissingCount==null?null:num(x.headSourceMissingCount),
    headSourceUnversionedCount:x.headSourceUnversionedCount==null?null:num(x.headSourceUnversionedCount),
+   runtimeAssetsChecked:nullableCount(x.runtimeAssetsChecked),
+   runtimeAssetsMissing:nullableCount(x.runtimeAssetsMissing),
+   runtimeAssetsUnversioned:nullableCount(x.runtimeAssetsUnversioned),
    headSourceBrowserE2EVerified:false,
    currentWorkIdRegistered:x.currentWorkIdRegistered===true,
    sourceReferenceCount:x.sourceReferenceCount==null?null:num(x.sourceReferenceCount),

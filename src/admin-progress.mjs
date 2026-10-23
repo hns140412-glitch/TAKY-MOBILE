@@ -23,6 +23,30 @@ const QA_PROJECT_TAGS={
  'PLAY-CAMP':['PLAY','PLAY-CAMP'], 'TAKY-MOBILE':['TAKY-MOBILE'],
  'SAVEY':['SAVEY']
 };
+// User-facing meaning is a static, audited mapping of exact QA IDs. The
+// server deliberately withholds original QA 'why' (may contain private data).
+// An unknown ID remains unresolved rather than guessed or shown as fixed.
+const QA_ACTIONS={
+ 'hide-user-violation-user-0922-link-three-states':'사용자 결정 위반 · LINK 3단계 중 원리 탐색과 관련 선택 미구현 · 원자료 기반 복구 필요',
+ 'hide-source-gap-user-0922-catch-scope':'승인 범위 보류 · CATCH 상세 화면 내용의 직접 승인 근거 부족',
+ 'hide-source-gap-qa-not-parity':'화면 품질 보류 · 동작 테스트는 승인 시안과의 1:1 비교가 아님',
+ 'hide-hanja-canonical-learning-link':'중앙 학습 연결 보류 · 한자 참고훈음 학습의 장기 복습·성취 근거 미확보',
+ 'hide-device-local-ocr-ios-engine-real-photo':'실기기 보류 · iPhone에서 실제 시험지 OCR과 부모 확인 미검증',
+ 'hide-six-subject-real-device-and-learning':'다과목 연동 보류 · 6과목의 실기기·중앙 배정·복습 왕복 미검증',
+ 'snap-expression-validity':'의미 검증 보류 · 단순 형식 통과만으로 표현·사고의 발전을 증명할 수 없음',
+ 'cross-app-learning-achievement-evidence':'성취 검증 보류 · 활동 완료와 검증된 학습 성과 구분, Play Camp 음원 승인 필요',
+ 'visual-family-role-e2e':'가족 사용 검증 보류 · 부모·학습자 실제 화면의 연속 조작 미검증',
+ 'ready-pointer-navigation-timeout':'다중앱 안정성 보류 · Ready 단독 통과와 전체 앱·실기기 왕복은 별개',
+ 'savey-cross-app-family-e2e':'가족 통합 보류 · 학습·미션·금융 데이터의 같은 가족 연결 미검증',
+ 'mobile-legacy-ops-release-qa-auth-migration':'관리자 테스트 보류 · 인증 경계에 맞춘 기존 OPS 시나리오 재현성 확인 필요',
+ 'administrator-qa-consumption':'운영 확인 보류 · 로컬 관리자 QA 표시와 운영 서버 게시·조치 환류는 별개',
+ 'hide-snap-browser-e2e':'실환경 보류 · Hide/Snap 로컬 브라우저 복귀와 중앙 기록·실기기 복귀는 별개',
+ 'tablet-fold-audio-usability':'태블릿 사용 검증 보류 · 접기·페이지 이동·소리 안내의 실기기 품질 미검증',
+ 'production-device-session':'실기기 보류 · 운영 iOS/Android 인증 세션·오프라인 복구·동기화 미검증',
+ 'multi-specialist-browser-stability':'전문앱 연속 검증 보류 · 세 앱 왕복의 실증과 승인된 소리 데이터 필요'
+};
+function qaAction(id){return Object.hasOwn(QA_ACTIONS,id)?QA_ACTIONS[id]:'기존 QA 원본에서 근거·다음 행동 확인 필요 · 자동 해결 금지'}
+
 function projectQaGaps(projectId,qa){
  const tags=QA_PROJECT_TAGS[projectId];
  if(!tags||!Array.isArray(qa?.gaps))return [];
@@ -54,7 +78,46 @@ export function renderAdminProgress(host,data){
  });
  if(data.counts?.sourceHeadGuardStatus){
   const drift=Number.isSafeInteger(data.counts.headModifiedReachableSources)?data.counts.headModifiedReachableSources:'근거 없음';
-  el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개 · 제품 복원 인증 아님','admin-caption');
+  const checked=data.counts.runtimeAssetsChecked;
+  const untracked=data.counts.runtimeAssetsUnversioned;
+  const missing=data.counts.runtimeAssetsMissing;
+  const assetText=Number.isSafeInteger(checked)&&Number.isSafeInteger(untracked)&&Number.isSafeInteger(missing)
+    ?` · 실제 참조 실행 자산 ${checked}개 / Git 미등록 ${untracked}개 / 누락 ${missing}개`
+    :' · 실행 자산 등록·누락 검사 근거 미연결';
+  el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개'+assetText+' · 제품 복원 인증 아님','admin-caption');
+ }
+ if(data.operator){
+  const e=data.operator.localExecution||{},c=data.operator.collector||{};
+  const fresh=e.stale?' (관측 시점 오래됨·현재 실행 보장 아님)':' (최근 로컬 실행 영수증)';
+  const queue=Number.isSafeInteger(e.dependencyWait)
+    ?`선행조건 대기 ${e.dependencyWait}건 · 진단 신규 처리 ${e.recentActions??'미확인'}건 · 즉시 실행 가능 진단 ${e.localReady??'미확인'}건`
+    :'진단 실행·선행조건 집계 근거 미연결';
+  el(host,'p','로컬 실행기: '+e.status+' · '+queue+fresh+' · 제품 작업 완료 아님','admin-caption');
+  const codes=Array.isArray(c.blockerCodes)?c.blockerCodes:[];
+  const blockerLabels={
+    CURRENT_NOTION_DIFFERS_FROM_TEN_STAGE_RECEIPT:'노션 수집 갱신분과 10단계 영수증 불일치',
+    CURRENT_INVENTORY_DIFFERS_FROM_TEN_STAGE_RECEIPT:'원본 목록과 10단계 영수증 불일치',
+    UNEXTRACTED_RAW:'RAW 원문 추출 대기',
+    LEARNING_NOT_INTEGRATED:'학습 엔진 연동 대기',
+    NON_AUTHORITATIVE_CANDIDATE:'미승인 후보',
+    PRODUCTION_NOT_RELEASED:'배포 전 검증 대기',
+    SIEZEALL_REMOTE_INBOX_POLL_NOT_VERIFIED:'원격 수집 확인 안 됨',
+    WORK_OS_ARCHIVE_RECURSIVE_READBACK_OPEN:'Work OS 보관 원본 대조 대기'
+  };
+  const leading=codes.filter(x=>Object.hasOwn(blockerLabels,x)).slice(0,4).map(x=>blockerLabels[x]);
+  el(host,'p','수집/FORMING 실행: '+c.status+' · 미해결 근거 '+codes.length+'종'+
+    (leading.length?' · '+leading.join(' / '):'')+
+    (codes.length>leading.length?' 외 '+(codes.length-leading.length)+'종':'')+
+    (c.stale?' · 상태 기록 오래됨':'')+' · 전체 10단계 학습·배포 검증 아님','admin-caption');
+  if(c.candidateSourceHashVerified===true&&c.status==='FRESH_CANDIDATE_INCOMPLETE'){
+    // Display individually proven counts; a missing observation must remain
+    // unknown, never silently hide the verified numbers or fabricate zero.
+    const count=x=>Number.isSafeInteger(x)&&x>=0?x+'개':'미확인';
+    el(host,'p','C2S 증거 기준 · FORMING 참고 패킷 '+count(c.candidatePackets)+
+      ' / 미추출 RAW '+count(c.pendingRaw)+' / 시각 검토 '+count(c.visualReview)+
+      ' / 추가 추출 원본 '+count(c.recoveredRaw)+
+      ' · 학습 승인 및 배포 아님','admin-caption');
+  }
  }
  if(data.modelLane){
   const m=data.modelLane;
@@ -62,6 +125,35 @@ export function renderAdminProgress(host,data){
     ?'서명 검증 TAKY2 실행 대기 '+m.pendingNeverClaimed+'건 · 호출 결과 불명 '+m.unknownOutcome+'건 · 독립 검토 경로 '+(m.independentReviewRouteHeld?'HOLD':'대기 기록 미확인')+' · 모델 호출/완료 증명 아님'
     :'TAKY2 서명 상태 확인 불가 ('+m.status+') · 기존 작업 상태 유지';
   el(host,'p',info,'admin-caption');
+ }
+ if(data.systemGates?.state==='HOLD_NOT_RELEASE_VERIFIED'&&
+    Array.isArray(data.systemGates.gates)&&data.systemGates.gates.length===6){
+  const overview=el(host,'section','','admin-system-gates');
+  el(overview,'h3','TAKY 전체 연결 · 우선 확인 게이트');
+  el(overview,'p','원본 → WORK_ID → AI 독립검토 → HEAD 재현 → 마이닝·FORMING → 실기기·배포. 모든 수치는 관측된 미해결 근거이며 완료율이 아닙니다.','admin-caption');
+  const labels={
+   CURRENT_AUTHORITY:'① 원본 CURRENT · 프로젝트 상태',
+   WORK_ID_OWNERSHIP:'② 기존 작업 ID · 산출물 소유권',
+   AI_INDEPENDENT_REVIEW:'③ AI 실행 · 독립 검토',
+   HEAD_REPRODUCIBILITY:'④ Git HEAD · 실행 자산 재현성',
+   RAW_TO_FORMING:'⑤ 원문 독립 분석 · 교차 검토',
+   PRODUCT_RELEASE_QA:'⑥ 실제 앱 검증 · 승인 · 배포'
+  };
+  for(const gate of data.systemGates.gates){
+    if(!Object.hasOwn(labels,gate.id))continue;
+    const count=v=>Number.isSafeInteger(v)?String(v):'미해결 수량 근거 없음';
+    const a=count(gate.observedUnresolved),b=count(gate.secondaryUnresolved),c=count(gate.tertiaryUnresolved);
+    const observations={
+     CURRENT_AUTHORITY:`프로젝트 상태 불일치 ${a}개 · CURRENT 대기/로컬 변경 ${b}개`,
+     WORK_ID_OWNERSHIP:`산출물 연결 없는 변경 경로 ${a}개 · 기존 미연결 AI 작업 ${b}건`,
+     AI_INDEPENDENT_REVIEW:`검토자 미지정 AI 작업 ${a}건 · 독립 검증 별도`,
+     HEAD_REPRODUCIBILITY:`HEAD 참조 소스 차이 ${a}개 · 미등록 실행 자산 ${b}개`,
+     RAW_TO_FORMING:`동일 원문 분석·교차검토 동결 근거 부족 ${a}/4단계`,
+     PRODUCT_RELEASE_QA:`QA ${data.systemGates.qaBasisMode==='deep'?'심층':'관측'} 기준 · 검증 공백 ${a}건 · 차단 ${b}건 · 승인 대기 ${c}건`
+    };
+    el(overview,'p',labels[gate.id]+' — '+observations[gate.id]+' · HOLD','admin-caption');
+  }
+  el(overview,'p','실제 사용자 승인·독립 검토·배포 증거 없이 자동 완료 처리하지 않습니다.','admin-caption');
  }
  const metrics=el(host,'div','','admin-metrics');
  for(const [k,v] of [['프로젝트',data.counts.projects],['AI 작업',data.counts.work],['검토 대기',data.counts.review],['차단 기록',data.counts.blocked],['독립 검증 표시',data.counts.verified],...(Array.isArray(data.backlog)?[['백로그 작업',data.backlog.length]]:[]),...(data.qa?[['QA 실패',data.qa.failed],['QA P0 공백',data.qa.gaps.filter(g=>g.priority==='P0').length]]:[])]){const c=el(metrics,'div','','admin-metric');el(c,'small',k);el(c,'strong',v)}
@@ -91,6 +183,7 @@ export function renderAdminProgress(host,data){
        `코드 기록 ${project.latestCodeAt||'미확인'} (코드 활동은 개발 완료 증명 아님)`,
        `로컬 복구 상태: ${recoveryLabel[project.observedRecoveryState]||'근거 미연결'}`,
        `HEAD 진입파일: ${project.headEntrypointIntegrity||'미검증'} · ${sourceLabel[project.headSourceParity]||'근거 미연결'} · 변경된 참조 소스 ${project.headSourceDriftCount??'미확인'}개`,
+       `참조 실행 자산 ${project.runtimeAssetsChecked??'미확인'}개 · Git 미등록 ${project.runtimeAssetsUnversioned??'미확인'}개 · 파일 누락 ${project.runtimeAssetsMissing??'미확인'}개 (스냅샷, 브라우저 QA 별개)`,
        `원본 연결: 작업 ID 등록 ${project.currentWorkIdRegistered?'있음':'없거나 미확인'} · 원자료 참조 ${project.sourceReferenceCount??'미기록'}건 · 산출물 참조 ${project.outputReferenceCount??'미기록'}건 · 보류 조건 ${project.pendingGateCount??'미기록'}건`,
        '위 소스 및 참조 숫자는 작업 완료·독립 QA·승인 증거가 아닙니다.']);n++;
      if(project.currentWorkId&&project.currentWorkRegistration==='CURRENT_DECLARED_REGISTERED'){
@@ -113,7 +206,7 @@ export function renderAdminProgress(host,data){
        const critical=qaRelated.filter(g=>g.priority==='P0').length;
        card('연관 가족앱 검증 공백 · 작업 배정 아님',[
          `원본 QA 영역 태그로 연결된 미해결 ${qaRelated.length}건 (P0 ${critical}건)`,
-         qaRelated.map(g=>g.priority+' '+g.id).join(' · '),
+         qaRelated.map(g=>g.priority+' '+g.id+' — '+qaAction(g.id)).join(' · '),
          '로컬 QA 관측 기반입니다. 원본 작업 계약·실기기·성취 결과를 검증하지 않았으며 자동 완료하거나 실행하지 않습니다.'
        ]);n++;
      }
@@ -232,7 +325,8 @@ export function renderAdminProgress(host,data){
        if(q&&![g.id,g.area,g.priority].join(' ').toLocaleLowerCase().includes(q))continue;
        card(`${g.priority} · ${g.area}`,[
          `미해결 QA 작업: ${g.id}`,
-         '기존 QA 원본과 실제 사용자 동작을 대조하여 개선·재검증 필요. PASS 개수로 자동 해소하지 않음.'
+         qaAction(g.id),
+         '원자료·작업 연결·실제 소비 검증이 끝나기 전까지 완료 아님. PASS 개수로 자동 해소하지 않음.'
        ]);n++;
      }
    }

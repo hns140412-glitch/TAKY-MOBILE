@@ -35,10 +35,33 @@ let releaseCalls=0;
 async function scenario(name,viewport,gateway,fn){
   const context=await browser.newContext({serviceWorkers:'block',viewport});
   releaseCalls=0;
+  let sessionGranted=false,protectedCallsBeforeAuth=0;
   const errors=[];
   await context.route('**/*',route=>{
     const u=new URL(route.request().url());
     if(u.origin!==`http://127.0.0.1:${PORT}`)return route.abort();
+    if(u.pathname==='/.netlify/functions/admin-session'){
+      const method=route.request().method();
+      if(method==='GET')return route.fulfill({status:200,contentType:'application/json',
+        body:JSON.stringify({ok:true,authorized:sessionGranted})});
+      if(method==='POST'){
+        const key=route.request().postDataJSON()?.key;
+        sessionGranted=key==='local-console-qa-only';
+        return route.fulfill({status:sessionGranted?200:401,contentType:'application/json',
+          body:JSON.stringify({ok:sessionGranted,authorized:sessionGranted})});
+      }
+      if(method==='DELETE'){
+        sessionGranted=false;
+        return route.fulfill({status:200,contentType:'application/json',
+          body:'{"ok":true,"authorized":false}'});
+      }
+    }
+    if(u.pathname==='/.netlify/functions/admin-progress'){
+      if(!sessionGranted)protectedCallsBeforeAuth++;
+      return route.fulfill({status:sessionGranted?200:401,contentType:'application/json',
+        body:JSON.stringify(sessionGranted?{ok:false,error:'LOCAL_QA_SNAPSHOT_UNAVAILABLE'}:
+          {ok:false,error:'ADMIN_AUTH_REQUIRED'})});
+    }
     if(u.pathname==='/.netlify/functions/canonical'){
       if(gateway==='auth')return route.fulfill({status:401,contentType:'application/json',body:'{"ok":false,"error":"AUTH_REQUIRED"}'});
       if(gateway==='ok'||gateway==='stale')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(BUNDLE)});
@@ -56,13 +79,29 @@ async function scenario(name,viewport,gateway,fn){
   await page.goto(BASE,{waitUntil:'load'});
   const saveyCard=page.locator('#appGrid .app-card').filter({hasText:'SAVEY'});
   assert.equal(await saveyCard.locator('a.app-open').getAttribute('href'),'https://savey-taky.netlify.app');
-  assert.match(await saveyCard.textContent(),/Netlify 인증 필요/);
-  assert.equal(await saveyCard.locator('a[href*="app.netlify.com/projects/savey-taky/deploys"]').count(),1);
+  assert.equal(await saveyCard.locator('a[href*="app.netlify.com/projects/savey-taky/deploys"]').count(),0,
+    'deploy links must stay private before login');
+  assert.equal(await page.locator('.nav-btn[data-target="ops"]').isVisible(),false,
+    'OPS must stay hidden for the unauthenticated visitor');
+  assert.equal(await page.locator('#operationsPanel').isVisible(),false,
+    'operations details must not be exposed to guests');
+  assert.equal(protectedCallsBeforeAuth,0,'private progress never fetched as guest');
+  await page.locator('#adminLoginBtn').click();
+  await page.locator('#adminLoginKey').fill('local-console-qa-only');
+  await page.locator('#adminLoginSubmitBtn').click();
+  await page.locator('.nav-btn[data-target="ops"]').waitFor({state:'visible',timeout:9000});
+  assert.equal(sessionGranted,true,'local synthetic session must be accepted before checking OPS');
+  assert.equal(protectedCallsBeforeAuth,0,'no protected API reads before signed session');
+  // Successful login opens the private administrator screen. The legacy OPS
+  // strip lives on the TAKY home screen and is not visible until returning.
+  await page.locator('.nav-btn[data-target="taky"]').click();
   await page.waitForSelector('#operationsList .ops-strip-counts');
   await page.waitForFunction(()=>!/checking/.test(document.getElementById('canonicalStatus').textContent));
   await page.waitForSelector('[data-check="github-revision"][data-evidence]',{state:'attached'});
   const out=await fn(page);
   out.releaseCalls=releaseCalls;
+  out.guestIsolation=true;
+  out.protectedCallsBeforeAuth=protectedCallsBeforeAuth;
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   assert.ok(overflow<=0,`${name}: horizontal overflow ${overflow}px`);
   assert.deepEqual(errors,[],`${name}: page errors`);
@@ -174,10 +213,40 @@ try{
       assert.equal((await fetch(`http://127.0.0.1:${QPORT}/__taky_qa_summary`,{method:'POST'})).status===200,false);
       const context=await browser.newContext({serviceWorkers:'block',viewport:{width:390,height:844}});
       const external=[];
-      await context.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!==`http://127.0.0.1:${QPORT}`){external.push(u.origin);return route.abort();}return route.continue();});
+      let locallyAuthorized=false,guestProtectedReads=0;
+      await context.route('**/*',route=>{
+        const u=new URL(route.request().url());
+        if(u.origin!==`http://127.0.0.1:${QPORT}`){external.push(u.origin);return route.abort();}
+        if(u.pathname==='/.netlify/functions/admin-session'){
+          const method=route.request().method();
+          if(method==='GET')return route.fulfill({status:200,contentType:'application/json',
+            body:JSON.stringify({ok:true,authorized:locallyAuthorized})});
+          if(method==='POST'){
+            locallyAuthorized=route.request().postDataJSON()?.key==='local-qa-summary-only';
+            return route.fulfill({status:locallyAuthorized?200:401,contentType:'application/json',
+              body:JSON.stringify({ok:locallyAuthorized,authorized:locallyAuthorized})});
+          }
+        }
+        if(u.pathname==='/.netlify/functions/admin-progress'){
+          if(!locallyAuthorized)guestProtectedReads++;
+          return route.fulfill({status:200,contentType:'application/json',body:'{"ok":false,"error":"LOCAL_QA_ONLY"}'});
+        }
+        return route.continue();
+      });
       const page=await context.newPage();
       const errs=[];page.on('pageerror',e=>errs.push(String(e)));
       await page.goto(`http://127.0.0.1:${QPORT}/`,{waitUntil:'load'});
+      // The app initializes IndexedDB asynchronously after the load event;
+      // rendered cards prove boot/bind has reached the interaction phase.
+      await page.locator('#appGrid .app-card').first().waitFor({state:'attached',timeout:12000});
+      assert.equal(await page.locator('.nav-btn[data-target="ops"]').isVisible(),false);
+      assert.equal(guestProtectedReads,0);
+      await page.locator('#adminLoginBtn').click();
+      await page.locator('#adminLoginSheet:not(.hidden)').waitFor({state:'visible',timeout:6000});
+      await page.locator('#adminLoginKey').fill('local-qa-summary-only');
+      await page.locator('#adminLoginSubmitBtn').click();
+      await page.locator('.nav-btn[data-target="ops"]').waitFor({state:'visible',timeout:8000});
+      assert.equal(guestProtectedReads,0);
       await page.locator('.nav-btn[data-target="ops"]').click();
       const qa=page.locator('[data-check="local-qa-report"]');
       await qa.waitFor({state:'attached'});
@@ -210,11 +279,13 @@ try{
       return route.abort();});
     const page=await context.newPage();
     await page.goto('http://taky-offsite.test/',{waitUntil:'load'});
-    await page.locator('.nav-btn[data-target="ops"]').click();
-    assert.equal(await page.locator('[data-check="local-qa-report"]').getAttribute('data-state'),'NOT_CONNECTED');
-    assert.equal(await page.locator('[data-check="local-qa-report"] [data-gap]').count(),0);
+    // Off-localhost guests may not access the OPS QA panel or make local
+    // machine QA reads; NOT_CONNECTED is a private admin state, not a
+    // public badge to expose.
+    assert.equal(await page.locator('.nav-btn[data-target="ops"]').isVisible(),false);
+    assert.equal(await page.locator('#operationsPanel').isVisible(),false);
     assert.deepEqual(hit,[]);
-    result.scenarios['qa-off-localhost']={state:'NOT_CONNECTED',requests:0};
+    result.scenarios['qa-off-localhost']={state:'PRIVATE_NOT_CONNECTED',requests:0};
     await context.close();
   }
 

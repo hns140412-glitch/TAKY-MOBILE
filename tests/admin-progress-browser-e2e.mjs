@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {readLatestLocalAdminFixture} from './local-workbench-admin-snapshot.mjs';
+import adminLogin from '../netlify/functions/admin-session.mjs';
+import adminProgress from '../netlify/functions/admin-progress.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +31,13 @@ fixture.backlog=[
  {id:'CLN-002',title:'Join exact work source',priority:'P0',status:'IMPLEMENTING',phase:'AFTER_CLEANUP',category:'POST_CLEANUP',dependencies:['CLN-001'],unresolvedDependencies:['CLN-001'],approvalRequired:false,externalDependencyCount:0,evidenceReferenceCount:2},
  {id:'UPD-001',title:'Publisher gate',priority:'P0',status:'BLOCKED',phase:'GATE',category:'INTEGRATION',dependencies:[],unresolvedDependencies:[],approvalRequired:true,externalDependencyCount:0,evidenceReferenceCount:1}
 ];
+fixture.systemGates={schema:'TAKY_SYSTEM_GATE_DERIVED_V1',
+ state:'HOLD_NOT_RELEASE_VERIFIED',completionVerified:false,canAutoPromote:false,
+ qaBasisMode:'quick',qaBasisFinishedAt:'2026-10-22T10:00:00Z',
+ gates:['CURRENT_AUTHORITY','WORK_ID_OWNERSHIP','AI_INDEPENDENT_REVIEW',
+        'HEAD_REPRODUCIBILITY','RAW_TO_FORMING','PRODUCT_RELEASE_QA']
+  .map((id,i)=>({id,state:'HOLD',verified:false,observedUnresolved:i===3?null:i+1,
+    secondaryUnresolved:i+2,tertiaryUnresolved:i===5?7:null}))};
 fixture.counts.sourceHeadGuardStatus='WORKTREE_STATIC_PASS_HEAD_REPLAY_HOLD';
 fixture.modelLane={status:'SIGNED_RUNTIME_READ_ONLY',activeEntries:26,pendingNeverClaimed:2,unknownOutcome:4,callingOrClaimed:0,heldReviewScopes:2,independentReviewRouteHeld:true};
 fixture.counts.headModifiedReachableSources=2;
@@ -47,11 +56,46 @@ if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'){
  const source=latest.payload;
  assert.ok(latest.adminHash&&latest.snapshot,'actual local snapshot and pointer must be SHA-verified');
  assert.equal(source.modelLane?.status,'SIGNED_RUNTIME_READ_ONLY','signed model execution holds must be visible in the current source');
- fixture={ok:true,...source,work:source.work.map(w=>({
-   ...w,classificationAvailable:w.evidenceState==='DERIVED_RECORD_NOT_INDEPENDENT_EXECUTION_PROOF'
- }))};
+ // Test the actual authenticated Netlify allowlist transformation, not a raw
+ // desktop-only snapshot disguised as the browser's API response.
+ const origin='https://taky-mobile.netlify.app';
+ const oldEnv=Object.fromEntries(['TAKY_ADMIN_ACCESS_KEY','TAKY_ADMIN_SESSION_SECRET','TAKY_ADMIN_PROGRESS_JSON'].map(k=>[k,process.env[k]]));
+ try{
+   process.env.TAKY_ADMIN_ACCESS_KEY='local-admin-browser-fixture';
+   process.env.TAKY_ADMIN_SESSION_SECRET='local-admin-browser-signing-fixture';
+   process.env.TAKY_ADMIN_PROGRESS_JSON=JSON.stringify(source);
+   const loginReply=await adminLogin(new Request(origin+'/.netlify/functions/admin-session',{
+     method:'POST',headers:{origin,'Content-Type':'application/json'},
+     body:JSON.stringify({key:process.env.TAKY_ADMIN_ACCESS_KEY})}));
+   assert.equal(loginReply.status,200,'real admin API authentication must work');
+   const cookie=loginReply.headers.get('set-cookie').split(';')[0];
+   const sanitizedReply=await adminProgress(new Request(origin+'/.netlify/functions/admin-progress',{
+     method:'GET',headers:{cookie}}));
+   assert.equal(sanitizedReply.status,200,'SHA-verified fixture must satisfy real API contract');
+   fixture=await sanitizedReply.json();
+ }finally{
+   for(const [key,val] of Object.entries(oldEnv)){if(val===undefined)delete process.env[key];else process.env[key]=val;}
+ }
+ // Reconcile-generated counters are live data, not a fixed 2026-10-16
+ // fixture. The signed source and the authenticated API must agree exactly.
+ const collectorFields={candidatePackets:'packets',pendingRaw:'pending_raw',visualReview:'visual_review'};
+ for(const [key,sourceKey] of Object.entries(collectorFields)){
+   const expected=source.operator?.collector?.candidate_counts?.[sourceKey];
+   assert.ok(expected===null||(Number.isSafeInteger(expected)&&expected>=0),
+     'signed collector count invalid or omitted: '+key);
+   assert.equal(fixture.operator?.collector?.[key],expected,
+     'authenticated collector count changed or unknown became a fabricated zero: '+key);
+ }
+ assert.equal(fixture.operator?.collector?.candidateSourceHashVerified,true);
  assert.equal(fixture.counts.projects,9);
  assert.ok(fixture.qa?.openGaps>0,'actual snapshot must contain unresolved QA evidence');
+ // End-to-end invariant: latest QUICK cannot make the actual DEEP audio
+ // approval HOLD disappear from the authenticated browser.
+ assert.equal(fixture.qa?.mode,'deep','real fixture must use fresh deep QA source');
+ assert.equal(fixture.qa?.blocked,1,'unapproved Play Camp voice remains blocked');
+ assert.equal(fixture.systemGates?.qaBasisMode,'deep','release gate must source deep receipt');
+ assert.equal(fixture.systemGates?.gates?.[5]?.secondaryUnresolved,1,
+   'global release HOLD cannot treat an omitted quick scenario as passed');
 }
 let browser;
 try{
@@ -71,17 +115,52 @@ try{
    });
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(String(e)));
    await page.goto(base,{waitUntil:'load'});
-   await page.waitForTimeout(300);
+   try { await page.locator('#appGrid .app-card').first().waitFor({state:'attached',timeout:15000}); }
+   catch(error){
+     console.error('ADMIN_BOOT_DIAGNOSTIC',JSON.stringify({viewport,errors,url:page.url(),
+       appGrid:await page.locator('#appGrid').innerHTML().catch(()=>null),
+       readyState:await page.evaluate(()=>document.readyState).catch(()=>null)}));
+     throw error;
+   }
    assert.equal(await page.locator('.nav-btn[data-target="admin"]').isVisible(),false,'admin tab hidden before authentication');
    assert.equal(await page.locator('.nav-btn[data-target="ops"]').isVisible(),false,'OPS is not public');
    assert.equal(await page.locator('#operationsPanel').isVisible(),false,'operations panel is private');
    assert.equal(await page.locator('#appGrid .app-card').count(),5,'public app launcher remains');
    assert.equal(await page.locator('#appGrid a[href*="app.netlify.com/projects/"]').count(),0,'deploy links hidden');
+   const readyGuest=page.locator('#appGrid .app-card').filter({hasText:'Ready & Set'}).first();
+   const guestStart=readyGuest.locator('[data-app-learning-link="ready-set"]');
+   assert.equal(await readyGuest.locator('[data-app-learning="ready-set"]').count(),0,
+     'guest may not create an inaccessible admin WORK item');
+   assert.equal(await guestStart.count(),1,'guest learning start must be a real direct link');
+   assert.ok((await guestStart.getAttribute('href'))?.startsWith('https://'),
+     'guest direct Ready href must be normalized HTTPS in public fixture');
+   assert.equal(await guestStart.getAttribute('target'),null,'guest ready start keeps same tab');
+   assert.equal(await page.locator('#workList [data-work-execute]').count(),0,
+     'guest app render must not create hidden WORK tasks');
    await page.locator('#adminLoginBtn').click();
    await page.locator('#adminLoginKey').fill('local-qa-admin-only');
    await page.locator('#adminLoginSubmitBtn').click();
    await page.locator('.nav-btn[data-target="admin"]').waitFor({state:'visible'});
+   const readyAdmin=page.locator('#appGrid .app-card').filter({hasText:'Ready & Set'}).first();
+   assert.equal(await readyAdmin.locator('[data-app-learning="ready-set"]').count(),1,
+     'signed admin retains governed learning work creation');
+   assert.equal(await readyAdmin.locator('[data-app-learning-link="ready-set"]').count(),0,
+     'admin card should not present the guest-only workflow');
    await page.locator('#adminProgress .admin-metric').first().waitFor();
+   assert.equal(await page.locator('#adminProgress .admin-system-gates').count(),1,
+     'system-wide provenance gates must appear only after admin authentication');
+   const systemText=await page.locator('#adminProgress .admin-system-gates').innerText();
+   assert.match(systemText,/원본 CURRENT/);
+   assert.match(systemText,/Git HEAD/);
+   assert.match(systemText,/실제 앱 검증/);
+   assert.match(systemText,new RegExp('기존 미연결 AI 작업 '+
+     (fixture.systemGates.gates[1].secondaryUnresolved??'미해결 수량 근거 없음')+'건'));
+   assert.match(systemText,/HEAD 참조 소스 차이/);
+   assert.match(systemText,/미등록 실행 자산/);
+   assert.equal((systemText.match(/HOLD/g)||[]).length,6,
+     'none of the six cross-layer HOLD gates may be promoted to pass');
+   if(fixture.systemGates?.gates[3]?.observedUnresolved==null)
+     assert.match(systemText,/미해결 수량 근거 없음/);
    assert.match(await page.locator('#adminProgress').innerText(),/프로젝트/);
    assert.match(await page.locator('#adminProgress').innerText(),/TAKY/);
    assert.ok((await page.locator('#adminProgress').innerText()).includes(fixture.projects[0].signal));
@@ -92,9 +171,37 @@ try{
    assert.equal(await page.locator('#adminProgress .admin-lineage-node').count(),6*linked.length,'six evidence stages per explicitly linked work');
    const flow=await page.locator('#adminProgress').innerText();
    assert.match(flow,/HEAD 재현성 검사/,'admin must display worktree-vs-HEAD hold');
-   assert.match(flow,/서명 검증 TAKY2 실행 대기 2건/);
-   assert.match(flow,/독립 검토 경로 HOLD/);
-   assert.match(flow,/호출 결과 불명 4건/);
+   if(fixture.operator){
+     assert.match(flow,/로컬 실행기:/,'existing scheduled execution evidence must be displayed');
+     assert.match(flow,/수집\/FORMING 실행:/,'collector stage hold must be visible');
+     assert.match(flow,/제품 작업 완료 아님/,'local diagnostics must not become portfolio completion');
+     assert.match(flow,/전체 10단계 학습·배포 검증 아님/,'candidate evidence must not be promoted');
+     const c=fixture.operator.collector;
+     if(c?.candidateSourceHashVerified===true
+        &&c.status==='FRESH_CANDIDATE_INCOMPLETE'){
+       for(const [label,value] of [
+         ['FORMING 참고 패킷',c.candidatePackets],
+         ['미추출 RAW',c.pendingRaw],
+         ['시각 검토',c.visualReview],
+         ['추가 추출 원본',c.recoveredRaw]
+       ]){
+         const expected=Number.isSafeInteger(value)&&value>=0?value+'개':'미확인';
+         assert.ok(flow.includes(label+' '+expected),
+           'admin must show each verified count and keep absent source values unknown: '+label);
+       }
+       assert.match(flow,/학습 승인 및 배포 아님/);
+     }
+   }
+   if(Number.isSafeInteger(fixture.counts.runtimeAssetsUnversioned)){
+     assert.match(flow,new RegExp(`Git 미등록 ${fixture.counts.runtimeAssetsUnversioned}개`),
+       'actual asset custody count must be visible without claiming completion');
+   }
+   // Signed runtime receipts change when an unclaimed preflight is released or
+   // a governed reviewer returns. Assert exactly what the authenticated source says.
+   assert.match(flow,new RegExp('서명 검증 TAKY2 실행 대기 '+fixture.modelLane.pendingNeverClaimed+'건'));
+   assert.match(flow,new RegExp('독립 검토 경로 '+(fixture.modelLane.independentReviewRouteHeld?'HOLD':'대기 기록 미확인')));
+   assert.match(flow,new RegExp('호출 결과 불명 '+fixture.modelLane.unknownOutcome+'건'));
+   assert.match(flow,/모델 호출\/완료 증명 아님/);
    if(primary.headSourceParity==='SOURCE_DIFFERS_FROM_HEAD_NO_REPLAY_CLAIM'){
      assert.match(flow,/현재 앱 소스와 Git HEAD 불일치/);
      assert.match(flow,/코드 활동은 개발 완료 증명 아님/);
@@ -129,12 +236,19 @@ try{
          assert.match(expanded,/과거 작업 재실행 중지/,'stale source pin must remain visible, never auto rerun');
        await items.evaluateAll(nodes=>nodes.forEach((node,i)=>node.open=i===0));
      }
-     if(linked.some(w=>w.evidenceState==='DERIVED_RECORD_NOT_INDEPENDENT_EXECUTION_PROOF')){
-       assert.match(flow,/미실행 준비/);
-       assert.match(flow,/호출 주장/);
+     const shownDetails=page.locator('#adminProgress details.admin-flow-detail');
+     await shownDetails.evaluateAll(nodes=>nodes.forEach(node=>node.open=true));
+     const actualExpandedEvidence=await page.locator('#adminProgress').innerText();
+     if(linked.some(w=>w.classificationAvailable===true)){
+       // The API intentionally withholds precise counts when original Workbench
+       // receipt classification is unavailable. Evidence-state text alone is
+       // not permission to turn legacy unknowns into zeros.
+       assert.match(actualExpandedEvidence,/미실행 준비/);
+       assert.match(actualExpandedEvidence,/호출 주장/);
      }else{
-       assert.match(flow,/영수증 세부 분류 미연결/,'legacy snapshots cannot turn absent evidence into zeros');
+       assert.match(actualExpandedEvidence,/영수증 세부 분류 미연결/,'legacy snapshots cannot turn absent evidence into zeros');
      }
+     await shownDetails.evaluateAll(nodes=>nodes.forEach((node,i)=>node.open=i===0));
    }else{
      assert.match(flow,/연결된 AI 작업 증거 없음/,'unlinked snapshots must not invent a task graph');
    }
@@ -165,8 +279,20 @@ try{
      await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption('HIDE-SEEK');
      const projectEvidence=await page.locator('#adminProgress').innerText();
      assert.match(projectEvidence,/연관 가족앱 검증 공백/);
+     if(Number.isSafeInteger(fixture.projects.find(p=>p.id==='HIDE-SEEK')?.runtimeAssetsUnversioned)){
+       const expected=fixture.projects.find(p=>p.id==='HIDE-SEEK').runtimeAssetsUnversioned;
+       assert.match(projectEvidence,new RegExp(`Git 미등록 ${expected}개`));
+     }
      assert.ok(projectEvidence.includes('hide-hanja-canonical-learning-link'),
        'HIDE must show source-linked P0 gaps');
+     if(fixture.qa?.gaps?.some(g=>g.id==='hide-user-violation-user-0922-link-three-states')){
+       assert.ok(projectEvidence.includes('hide-user-violation-user-0922-link-three-states'),
+         'direct user LINK mismatch must remain visible in the actual admin screen');
+       assert.match(projectEvidence,/사용자 결정 위반 · LINK 3단계/,
+         'administrator must see the consequence, not an opaque failure ID alone');
+       assert.ok(fixture.qa.failed>0,
+         'a proven user-contract violation cannot appear in a green deep-QA status');
+     }
      assert.match(projectEvidence,/작업 배정 아님/);
      await page.locator('#adminProgress select[aria-label="오케스트라 프로젝트 선택"]').selectOption(primary.id);
    }
