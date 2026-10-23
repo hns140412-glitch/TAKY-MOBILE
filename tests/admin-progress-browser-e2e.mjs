@@ -89,13 +89,17 @@ if(process.env.TAKY_ADMIN_E2E_LOCAL_SNAPSHOT==='1'){
  assert.equal(fixture.operator?.collector?.candidateSourceHashVerified,true);
  assert.equal(fixture.counts.projects,9);
  assert.ok(fixture.qa?.openGaps>0,'actual snapshot must contain unresolved QA evidence');
- // End-to-end invariant: latest QUICK cannot make the actual DEEP audio
- // approval HOLD disappear from the authenticated browser.
- assert.equal(fixture.qa?.mode,'deep','real fixture must use fresh deep QA source');
- assert.equal(fixture.qa?.blocked,1,'unapproved Play Camp voice remains blocked');
+ // The newest QA may legitimately be QUICK, while the global release
+ // decision must still be based on the independent DEEP receipt. Never
+ // confuse the latest check with release-qualified evidence.
+ assert.equal(fixture.qa?.mode,source.qa?.mode,'display current signed QA mode');
+ assert.equal(fixture.qa?.blocked,source.qa?.blocked,'do not invent QA blockers');
+ assert.equal(fixture.qa?.productionVerified,false);
  assert.equal(fixture.systemGates?.qaBasisMode,'deep','release gate must source deep receipt');
+ assert.equal(fixture.systemGates?.gates?.[5]?.state,'HOLD',
+   'latest quick QA must never clear the release gate');
  assert.equal(fixture.systemGates?.gates?.[5]?.secondaryUnresolved,1,
-   'global release HOLD cannot treat an omitted quick scenario as passed');
+   'latest quick run cannot treat untested deep audio as approved');
 }
 let browser;
 try{

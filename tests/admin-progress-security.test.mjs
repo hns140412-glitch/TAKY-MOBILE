@@ -238,8 +238,15 @@ test('actual local Workbench snapshot stays sanitized through the admin endpoint
  assert.equal(data.backlog.length,source.backlog.length);
  assert.equal(data.backlog.find(x=>x.id==='CLN-002').status,'IMPLEMENTING');
  assert.equal(data.backlog.find(x=>x.id==='CLN-002').outcomeVerifiedByIndependentReview,false);
- assert.equal(data.counts.runtimeAssetsUnversioned,66);
- assert.equal(data.counts.runtimeAssetsChecked,289);
- assert.equal(data.projects.find(x=>x.id==='HIDE-SEEK').runtimeAssetsUnversioned,24);
+ // The signed Workbench snapshot evolves. Never assert historical 66/289/24
+ // after source HEAD assets have been versioned and independently reconciled.
+ assert.equal(data.counts.runtimeAssetsUnversioned,source.counts.runtimeAssetsUnversioned);
+ assert.equal(data.counts.runtimeAssetsChecked,source.counts.runtimeAssetsChecked);
+ assert.ok(Number.isInteger(data.counts.runtimeAssetsChecked) &&
+   data.counts.runtimeAssetsChecked>=data.counts.runtimeAssetsUnversioned);
+ const sourceHide=source.projects.find(x=>x.id==='HIDE-SEEK');
+ const publicHide=data.projects.find(x=>x.id==='HIDE-SEEK');
+ assert.ok(sourceHide&&publicHide);
+ assert.equal(publicHide.runtimeAssetsUnversioned,sourceHide.runtimeAssetsUnversioned);
  assert.equal(body.includes('why'),false);
 });
