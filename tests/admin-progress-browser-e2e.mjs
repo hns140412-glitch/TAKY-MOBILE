@@ -10,10 +10,27 @@ import {chromium} from 'file:///D:/Git%20PWA/Play%20Camp/node_modules/playwright
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
 const PORT=4293,base='http://127.0.0.1:'+PORT+'/';
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webmanifest':'application/manifest+json'};
+const CANONICAL_ROOT=fs.realpathSync(ROOT);
+const withinRoot=file=>{
+ const rel=path.relative(CANONICAL_ROOT,file);
+ return rel!==''&&rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel);
+};
+assert.equal(withinRoot(CANONICAL_ROOT),false,'root itself is not a public asset');
+assert.equal(withinRoot(path.join(path.dirname(CANONICAL_ROOT),path.basename(CANONICAL_ROOT)+'-sibling','secret.json')),false,
+ 'a sibling with the same directory name prefix is never inside the static test root');
 const server=http.createServer((req,res)=>{
- const rel=new URL(req.url,base).pathname.slice(1)||'index.html',f=path.resolve(ROOT,decodeURIComponent(rel));
- if(!f.startsWith(ROOT)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404);return res.end('not found')}
- res.writeHead(200,{'Content-Type':types[path.extname(f)]||'application/octet-stream','Cache-Control':'no-store'});fs.createReadStream(f).pipe(res);
+ try{
+  const rel=decodeURIComponent(new URL(req.url,base).pathname.slice(1)||'index.html');
+  const candidate=path.resolve(ROOT,rel);
+  if(!withinRoot(candidate)||!fs.existsSync(candidate)||!fs.statSync(candidate).isFile())
+   throw new Error('outside or missing');
+  const file=fs.realpathSync(candidate);
+  if(!withinRoot(file))throw new Error('symlink escape');
+  res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});
+  fs.createReadStream(file).pipe(res);
+ }catch{
+  res.writeHead(404);res.end('not found');
+ }
 });
 await new Promise(r=>server.listen(PORT,'127.0.0.1',r));
 let admin=false,preAuthDataCalls=0;
@@ -175,7 +192,75 @@ try{
    assert.equal(await page.locator('#adminProgress .admin-lineage-node').count(),6*linked.length,'six evidence stages per explicitly linked work');
    const flow=await page.locator('#adminProgress').innerText();
    assert.match(flow,/HEAD 재현성 검사/,'admin must display worktree-vs-HEAD hold');
+   if(fixture.counts?.aiJobsSignedHandoffState==='EXACT_SIGNED_HANDOFFS_RECONCILED_NOT_COMPLETION'){
+     assert.match(flow,new RegExp('AI 작업 서명 영수증: CLI 반환 '+fixture.counts.aiJobsSignedTransportOnly+'건'));
+     assert.match(flow,/검증된 독립 완료 0건/);
+     assert.match(flow,/모델 반환은 사용자 성과 완료가 아닙니다/);
+   }
+   if(fixture.pipeline?.siteWatchGateState==='SITE_RAW_AND_CODEX_CANDIDATES_NOT_FORMALLY_APPROVED'){
+     assert.match(flow,new RegExp('공개자료 검토: RAW '+fixture.pipeline.siteWatchRawProvenanceSources+'건'));
+     assert.match(flow,new RegExp('Codex 후보 '+fixture.pipeline.siteWatchCodexEvidenceCandidates+'건'));
+     assert.match(flow,new RegExp('정식 양방향 검토 '+fixture.pipeline.siteWatchFormalBilateralComplete+'건'));
+     assert.match(flow,/Index Owner 승인 0건/);
+   }
+   // Deterministic independent state matrix: the live local snapshot can be
+   // absent or incomplete and must not make these assertions disappear.
+   const reasonStates=await page.evaluate(async source=>{
+     const {renderAdminProgress}=await import('/src/admin-progress.mjs');
+     const variants={
+       missing:{...source,operator:null},
+       unknown:{...source,operator:{reasonExecutor:{state:'HOLD_REASON_EXECUTOR_STATUS_UNVERIFIED'}}},
+       noLive:{...source,operator:{reasonExecutor:{state:'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE'}}},
+       live:{...source,operator:{reasonExecutor:{state:'LIVE_DUAL_AGENT_SESSIONS_VISIBLE_NOT_OWNERSHIP_VERIFIED'}}},
+       missingDate:{...source,operator:{
+         reasonExecutor:{state:'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE'},
+         localExecution:{status:'REFRESHED_SHA_VERIFIED',stale:false}}},
+       unfoundedRecent:{...source,operator:{
+         reasonExecutor:{state:'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE'},
+         localExecution:{status:'REFRESHED_SHA_VERIFIED',stale:false,
+           observedAt:new Date(Date.now()-2*3600000).toISOString()}}},
+     };
+     return Object.fromEntries(Object.entries(variants).map(([key,value])=>{
+       const detached=document.createElement('div');
+       renderAdminProgress(detached,value);
+       return [key,detached.innerText||detached.textContent||''];
+     }));
+   },fixture);
+   for(const kind of ['missing','unknown']){
+     assert.match(reasonStates[kind],/리슨 실행자 상태가 미확인입니다/);
+     assert.match(reasonStates[kind],/로컬 근거 검사는 유지하고 실행자 상태를 재확인합니다/);
+     assert.doesNotMatch(reasonStates[kind],/최근 1시간 내 로컬 실행 영수증/);
+   }
+   assert.match(reasonStates.noLive,/기존 로컬 원본·영수증 검사는 계속 진행합니다/);
+   assert.match(reasonStates.noLive,/실제 Claude Code\/Codex 세션을 연결하고 WORK_ID로 인계합니다/);
+   assert.match(reasonStates.live,/기존 WORK_ID와 입력 SHA를 확인한 뒤 구현 영수증과 독립 검토 영수증을 각각 대조합니다/);
+   assert.match(reasonStates.live,/세션 관찰만으로 DONE 처리하지 않습니다/);
+   assert.match(reasonStates.missingDate,/로컬 실행 관측 시각·신선도 근거 미확인/);
+   assert.doesNotMatch(reasonStates.missingDate,/최근 1시간 내 로컬 실행 영수증/);
+   assert.match(reasonStates.unfoundedRecent,/로컬 실행 관측 시각·신선도 근거 미확인/);
+   assert.doesNotMatch(reasonStates.unfoundedRecent,/최근 1시간 내 로컬 실행 영수증/);
    if(fixture.operator){
+     if(fixture.operator.reasonExecutor?.state==='HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE'){
+       assert.match(flow,/리슨 통신은 연결됨/,'transport is separate from model execution');
+       assert.match(flow,/실제 실행 세션 미확인/,'no false ready claim');
+       assert.match(flow,/CLI 대기열은 모델 실행자가 아닙니다/,'CLI impersonation must not be promoted');
+       assert.match(flow,/다음 실행: 기존 로컬 원본·영수증 검사는 계속 진행합니다/,'model unavailability must not stall local work');
+       assert.match(flow,/실제 Claude Code\/Codex 세션을 연결하고 WORK_ID로 인계합니다/,'resume should describe concrete model handoff');
+     }
+     if(fixture.operator.reasonExecutor?.state==='LIVE_DUAL_AGENT_SESSIONS_VISIBLE_NOT_OWNERSHIP_VERIFIED'){
+       assert.match(flow,/구현 영수증과 독립 검토 영수증을 각각 대조합니다/,'live agents still require evidence');
+       assert.match(flow,/세션 관찰만으로 DONE 처리하지 않습니다/);
+     }
+     if(!fixture.operator.reasonExecutor ||
+       !['HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE','LIVE_DUAL_AGENT_SESSIONS_VISIBLE_NOT_OWNERSHIP_VERIFIED'].includes(fixture.operator.reasonExecutor.state)){
+       assert.match(flow,/리슨 실행자 상태가 미확인입니다/,'unknown route must not claim readiness');
+       assert.match(flow,/미확인 상태를 자동 승인이나 호출 성공으로 해석하지 않습니다/);
+     }
+     if(fixture.operator.reasonGuided?.state==='LAST_REASON_HANDOFF_PROVEN_BY_IMMUTABLE_RECEIPT'){
+       assert.match(flow,/리슨 인계 실증:/,'durable Reason message evidence must appear in admin');
+       assert.ok(flow.includes(fixture.operator.reasonGuided.taskId));
+       assert.match(flow,/사용자 승인·제품 완료 아님/,'Reason evidence must never promote DONE');
+     }
      assert.match(flow,/로컬 실행기:/,'existing scheduled execution evidence must be displayed');
      assert.match(flow,/수집\/FORMING 실행:/,'collector stage hold must be visible');
      assert.match(flow,/제품 작업 완료 아님/,'local diagnostics must not become portfolio completion');
@@ -345,9 +430,15 @@ try{
    fixture={...fixture,generatedAt:'2020-01-01T00:00:00Z'};
    await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
    await page.waitForFunction(()=>document.querySelector('#adminProgress')?.textContent?.includes('생성 후 24시간 초과'));
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.adminRefresh),'1',
+     'refresh must return keyboard focus to the replacement button');
+   assert.equal(await page.locator('#adminProgress [role="status"][data-snapshot-refresh="updated"]').count(),1,
+     'changed snapshot refresh must announce its result');
    assert.match(await page.locator('#adminProgress').innerText(),/실시간 실행 상태 아님|최신 실행 상태 미확인/);
    await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
    await page.locator('[data-snapshot-refresh="unchanged"]').waitFor({state:'visible'});
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.adminRefresh),'1');
+   assert.equal(await page.locator('#adminProgress [role="status"][data-snapshot-refresh="unchanged"]').count(),1);
    assert.match(await page.locator('#adminProgress').innerText(),/새로고침은 로컬 PC 작업이나 서버 게시를 실행하지 않습니다/);
    fixture={...fixture,generatedAt:savedGeneratedAt};
    await page.locator('#adminProgress button').filter({hasText:'관리자 스냅샷 다시 조회'}).click();
@@ -364,6 +455,27 @@ try{
      if(fixture.pipeline)assert.ok(t.includes(`본문 대기열 ${fixture.pipeline.notionTextStaged}건`));
      assert.ok(t.includes('계정 전체 대화 확보·검수 완료를 의미하지 않습니다.'));
    }
+   // Failed refresh preserves an authenticated historical snapshot, while an
+   // explicit session expiry must erase it rather than leaking stale admin data.
+   const healthyFixture=fixture;
+   fixture={ok:false,error:'ADMIN_TEMPORARY_READ_FAILURE'};
+   await page.locator('#adminProgress button[data-admin-refresh]').click();
+   await page.locator('#adminProgress [role="alert"]').waitFor({state:'visible'});
+   assert.match(await page.locator('#adminProgress').innerText(),/이전 스냅샷은 유지되며 다시 조회할 수 있습니다/);
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.adminRefresh),'1');
+   assert.equal(await page.locator('#adminProgress button[data-admin-refresh]').count(),1);
+   fixture={ok:false,error:'ADMIN_AUTH_REQUIRED'};
+   await page.locator('#adminProgress button[data-admin-refresh]').click();
+   // A transient-failure alert from the previous click is already visible.
+   // Wait for the actual 401 readback and private-data revocation, not that
+   // stale alert, before asserting that authenticated content was cleared.
+   await page.locator('#adminProgress [role="alert"]')
+     .filter({hasText:'관리자 인증이 필요합니다.'}).waitFor({state:'visible'});
+   assert.match(await page.locator('#adminProgress').innerText(),/관리자 인증이 필요합니다/);
+   assert.equal(await page.locator('#adminProgress button[data-admin-refresh]').count(),0);
+   assert.equal(await page.locator('#adminProgress .admin-progress-card').count(),0);
+   assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('role')),'alert');
+   fixture=healthyFixture;
    await page.locator('#adminLogoutBtn').click();
    await page.locator('.nav-btn[data-target="admin"]').waitFor({state:'hidden',timeout:10000});
    assert.equal(await page.locator('.nav-btn[data-target="admin"]').isVisible(),false,'admin hidden after logout');

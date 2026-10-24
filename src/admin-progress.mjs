@@ -58,7 +58,12 @@ function projectQaGaps(projectId,qa){
 function el(p,tag,txt='',cl=''){const e=document.createElement(tag);e.textContent=String(txt??'');if(cl)e.className=cl;p.append(e);return e}
 export function renderAdminProgress(host,data){
  host.replaceChildren();
- if(!data?.ok){el(host,'p',data?.error==='ADMIN_PROGRESS_NOT_CONFIGURED'?'관리자 관제 데이터가 아직 서버에 연결되지 않았습니다.':data?.error==='ADMIN_AUTH_REQUIRED'?'관리자 인증이 필요합니다.':'진행상황 조회 불가: '+(data?.error||'UNKNOWN'),'admin-error');return}
+ if(!data?.ok){
+  const error=el(host,'p',data?.error==='ADMIN_PROGRESS_NOT_CONFIGURED'?'관리자 관제 데이터가 아직 서버에 연결되지 않았습니다.':data?.error==='ADMIN_AUTH_REQUIRED'?'관리자 인증이 필요합니다.':'진행상황 조회 불가: '+(data?.error||'UNKNOWN'),'admin-error');
+  error.setAttribute('role','alert');
+  error.tabIndex=-1;
+  return;
+ }
  el(host,'p','워크벤치 등록 원자료 · 조회 전용 · 실제 개발 완료와 구분','admin-caption');
  el(host,'small','자료 생성 시각: '+(data.generatedAt||'미기록'));
  const stamp=Date.parse(data.generatedAt||''),age=Date.now()-stamp;
@@ -66,14 +71,47 @@ export function renderAdminProgress(host,data){
  el(host,'p',freshness,'admin-caption');
  const refresh=el(host,'button','관리자 스냅샷 다시 조회','quick');
  refresh.type='button';
+ refresh.dataset.adminRefresh='1';
  refresh.addEventListener('click',async()=>{
    refresh.disabled=true;
    const previous=data.generatedAt||'';
-   const updated=await readAdminProgress();
+   let updated;
+   try{
+     updated=await readAdminProgress();
+   }catch{
+     refresh.disabled=false;
+     const problem=el(host,'p','관리자 자료 조회에 실패했습니다. 기존 자료는 유지됩니다.','admin-error');
+     problem.setAttribute('role','alert');
+     return;
+   }
+   if(!updated?.ok){
+     if(updated?.error==='ADMIN_AUTH_REQUIRED'){
+       // Explicit authentication loss revokes previously displayed private data.
+       renderAdminProgress(host,updated);
+       host.querySelector('[role="alert"]')?.focus();
+     }else{
+       // A transient fetch/API failure cannot erase the signed earlier snapshot.
+       refresh.disabled=false;
+       const problem=el(host,'p','관리자 자료 조회에 실패했습니다. 이전 스냅샷은 유지되며 다시 조회할 수 있습니다.','admin-error');
+       problem.setAttribute('role','alert');
+       refresh.focus();
+     }
+     return;
+   }
    renderAdminProgress(host,updated);
-   if(updated.ok&&updated.generatedAt===previous){
-     const message=el(host,'p','서버 자료 생성 시각이 이전과 동일합니다. 새로고침은 로컬 PC 작업이나 서버 게시를 실행하지 않습니다.','admin-caption');
-     message.dataset.snapshotRefresh='unchanged';
+   const replacement=host.querySelector('[data-admin-refresh]');
+   replacement?.focus();
+   if(updated.ok){
+     const unchanged=updated.generatedAt===previous;
+     const message=el(host,'p','','admin-caption');
+     message.setAttribute('role','status');
+     message.setAttribute('aria-live','polite');
+     message.dataset.snapshotRefresh=unchanged?'unchanged':'updated';
+     queueMicrotask(()=>{
+       message.textContent=unchanged
+         ?'서버 자료 생성 시각이 이전과 동일합니다. 새로고침은 로컬 PC 작업이나 서버 게시를 실행하지 않습니다.'
+         :'관리자 자료를 다시 조회했습니다. 로컬 PC 작업이나 서버 게시를 실행하지 않았습니다.';
+     });
    }
  });
  if(data.counts?.sourceHeadGuardStatus){
@@ -86,13 +124,59 @@ export function renderAdminProgress(host,data){
     :' · 실행 자산 등록·누락 검사 근거 미연결';
   el(host,'p','Git HEAD 재현성 검사: '+data.counts.sourceHeadGuardStatus+' · 불일치 참조 소스 '+drift+'개'+assetText+' · 제품 복원 인증 아님','admin-caption');
  }
+ if(data.counts?.aiJobsSignedHandoffState==='EXACT_SIGNED_HANDOFFS_RECONCILED_NOT_COMPLETION'){
+  const cli=data.counts.aiJobsSignedTransportOnly;
+  const independentlyDone=data.counts.aiJobsIndependentlyComplete;
+  el(host,'p',
+    'AI 작업 서명 영수증: CLI 반환 '+(Number.isSafeInteger(cli)?cli:'미확인')+
+    '건 · 검증된 독립 완료 '+(Number.isSafeInteger(independentlyDone)?independentlyDone:'미확인')+
+    '건 · 모델 반환은 사용자 성과 완료가 아닙니다.','admin-caption');
+ }
+ if(data.pipeline?.siteWatchGateState==='SITE_RAW_AND_CODEX_CANDIDATES_NOT_FORMALLY_APPROVED'){
+  const count=v=>Number.isSafeInteger(v)?v+'건':'미확인';
+  el(host,'p','공개자료 검토: RAW '+count(data.pipeline.siteWatchRawProvenanceSources)+
+     ' · Codex 후보 '+count(data.pipeline.siteWatchCodexEvidenceCandidates)+
+     ' · 정식 양방향 검토 '+count(data.pipeline.siteWatchFormalBilateralComplete)+
+     ' · Index Owner 승인 '+count(data.pipeline.siteWatchFinalOwnerApproval)+
+     ' · 자동 학습·승인 없음','admin-caption');
+ }
+ const observedOperator=data.operator&&typeof data.operator==='object'?data.operator:{};
+ {
+  const agent=observedOperator.reasonExecutor||{};
+  // Reason is a transport signal, not a model-run or release authority.
+  // Guide the next verified action without parking the entire local workflow.
+  if(agent.state==='HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE'){
+    el(host,'p','리슨 통신은 연결됨 · 현재 Claude Code/Codex 실제 실행 세션 미확인 · CLI 대기열은 모델 실행자가 아닙니다.','admin-caption');
+    el(host,'p','다음 실행: 기존 로컬 원본·영수증 검사는 계속 진행합니다. AI 작업이 필요할 때 실제 Claude Code/Codex 세션을 연결하고 WORK_ID로 인계합니다.','admin-next-action');
+  }else if(agent.state==='LIVE_DUAL_AGENT_SESSIONS_VISIBLE_NOT_OWNERSHIP_VERIFIED'){
+    el(host,'p','리슨 Claude Code/Codex 세션 관찰됨 · 실제 작업 인계·수신 영수증 검증 전에는 실행 준비를 확정하지 않습니다.','admin-caption');
+    el(host,'p','다음 실행: 기존 WORK_ID와 입력 SHA를 확인한 뒤 구현 영수증과 독립 검토 영수증을 각각 대조합니다. 세션 관찰만으로 DONE 처리하지 않습니다.','admin-next-action');
+  }else{
+    el(host,'p','리슨 실행자 상태가 미확인입니다. 모델 실행 준비 여부를 확정하지 않습니다.','admin-caption');
+    el(host,'p','다음 실행: 로컬 근거 검사는 유지하고 실행자 상태를 재확인합니다. 미확인 상태를 자동 승인이나 호출 성공으로 해석하지 않습니다.','admin-next-action');
+  }
+  const rg=observedOperator.reasonGuided||{};
+  if(rg.state==='LAST_REASON_HANDOFF_PROVEN_BY_IMMUTABLE_RECEIPT'){
+    const state=rg.resultState==='LOCAL_SLICE_VERIFIED_NOT_PORTFOLIO_DONE'?'범위 제한 검사 통과':
+      rg.resultState==='LOCAL_SLICE_FINDINGS_NEED_ACTION'?'미해결 사항 확인':'검토 필요';
+    el(host,'p','리슨 인계 실증: '+rg.taskId+' · '+state+
+       ' · 원본 영수증 검증 · 사용자 승인·제품 완료 아님','admin-caption');
+  }
+ }
  if(data.operator){
   const e=data.operator.localExecution||{},c=data.operator.collector||{};
-  const fresh=e.stale?' (관측 시점 오래됨·현재 실행 보장 아님)':' (최근 로컬 실행 영수증)';
+  const reportedAt=Date.parse(e.observedAt||'');
+  const ageMs=Date.now()-reportedAt;
+  const recent=Number.isFinite(reportedAt)&&ageMs>=0&&ageMs<=3600000;
+  const observed=typeof e.status==='string'&&e.status.length>0;
+  const fresh=observed&&e.stale===false&&recent
+    ?' (최근 1시간 내 로컬 실행 영수증 · 현재 실행 보장 아님)'
+    :observed&&e.stale===true?' (관측 시점 오래됨·현재 실행 보장 아님)'
+    :' (로컬 실행 관측 시각·신선도 근거 미확인)';
   const queue=Number.isSafeInteger(e.dependencyWait)
     ?`선행조건 대기 ${e.dependencyWait}건 · 진단 신규 처리 ${e.recentActions??'미확인'}건 · 즉시 실행 가능 진단 ${e.localReady??'미확인'}건`
     :'진단 실행·선행조건 집계 근거 미연결';
-  el(host,'p','로컬 실행기: '+e.status+' · '+queue+fresh+' · 제품 작업 완료 아님','admin-caption');
+  el(host,'p','로컬 실행기: '+(observed?e.status:'상태 미확인')+' · '+queue+fresh+' · 제품 작업 완료 아님','admin-caption');
   const codes=Array.isArray(c.blockerCodes)?c.blockerCodes:[];
   const blockerLabels={
     CURRENT_NOTION_DIFFERS_FROM_TEN_STAGE_RECEIPT:'노션 수집 갱신분과 10단계 영수증 불일치',
