@@ -61,6 +61,9 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   if(!action||!signout)return {ok:false,state:'FAMILY_LOGIN_VIEW_MISSING'};
   action.addEventListener('click',()=>void begin());
   signout.addEventListener('click',signOut);
+  action.disabled=false;
+  // Testable readiness means handlers are bound, NOT that anyone is signed in.
+  document.documentElement.dataset.takyFamilySigninReady='true';
   // Non-secret marker only: ask for Google sign-in again once; never reuse identity.
   if(markGet()&&!globalThis.TAKY_FAMILY_RUNTIME&&!installed)void begin().then(r=>{
    if(r.state==='GOOGLE_BUTTON_READY')say('페이지가 이동되어 가족 로그인이 해제되었습니다. 다시 확인하려면 Google 로그인 버튼을 누르세요. 재인증이 필요할 수 있습니다.');
