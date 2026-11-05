@@ -1,0 +1,26 @@
+{
+  "pass": true,
+  "scenarios": {
+    "mobile-unreachable": {
+      "lanes": 6,
+      "releaseCalls": 1,
+      "overflow": 0
+    },
+    "mobile-auth-required": {
+      "primary": "auth",
+      "releaseCalls": 1,
+      "overflow": 0
+    },
+    "desktop-remote-verified": {
+      "canonical": "VERIFIED",
+      "release": "LIVE_VERIFIED",
+      "releaseCalls": 2,
+      "overflow": 0
+    },
+    "mobile-release-stale": {
+      "release": "HISTORICAL",
+      "releaseCalls": 1,
+      "overflow": 0
+    }
+  }
+}

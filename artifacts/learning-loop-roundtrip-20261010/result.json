@@ -1,0 +1,29 @@
+{
+  "pass": true,
+  "scenario": "TAKY MOBILE ㄱ -> READY -> HIDE -> READY SESSION END -> TAKY MOBILE VERIFIED",
+  "steps": {
+    "mobile_work_created": true,
+    "mobile_dispatched_to_ready": {
+      "workId": "learning-loop-1792104146645-a06396",
+      "hasNonce": true,
+      "hideTarget": "http://127.0.0.1:4352"
+    },
+    "ready_session_started": {
+      "session_id": "s_1792104147346",
+      "task_id": "task_s_1792104147346_1",
+      "planner_id": "mobile-loop-planner-task"
+    },
+    "hide_evidence": {
+      "mode": "TRACE",
+      "term": "apple",
+      "result": "SELF_KNOWN"
+    },
+    "mobile_result_received": {
+      "state": "COMPLETED",
+      "receipt": "LEARNING_LOOP_RESULT_RECEIVED",
+      "awaitingTracePreserved": true,
+      "returnParamsCleared": true
+    }
+  },
+  "errors": []
+}

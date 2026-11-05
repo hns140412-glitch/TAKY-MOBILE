@@ -1,0 +1,5 @@
+# TAKY Mobile — read-only release verification integration
+
+Review OS/DEPLOYMENT_OPS.md in TAKY and current TAKY-MOBILE README, netlify/functions/_auth.mjs, canonical.mjs, src/admin-status.mjs, src/app.js and existing tests. Preserve dirty worktree.
+
+Implement narrow server-side authenticated read-only GitHub repository revision status and Netlify deployment status, using only already configured credentials if present. No new paid API or secret in browser, no write/trigger deploy. If Netlify token/site id missing, explicitly return NOT_CONNECTED rather than fake live. Client must distinguish LIVE_VERIFIED, HISTORICAL, AUTH_REQUIRED, UNAVAILABLE and NEVER imply the old deployment is current. Avoid exposing secrets, private repository file content or untrusted URLs. No credential registration or live external call in tests; inject fetch/mock. Keep existing owner console and WORK/TRACE behavior. Add deterministic tests for success, unauthorized, missing credentials, provider error and stale results. Test locally and report exact proof/gaps. No push, deploy, commit or master changes.

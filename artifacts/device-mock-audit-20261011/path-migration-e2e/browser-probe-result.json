@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-10-11T10:42:00.895Z",
+  "target": "http://127.0.0.1:4396/",
+  "server_pid": 727960,
+  "steps": [
+    {
+      "label": "chrome_launch",
+      "ms": 1886,
+      "detail": ""
+    },
+    {
+      "label": "data_domcontentloaded",
+      "ms": 41,
+      "detail": ""
+    },
+    {
+      "label": "mobile_http_commit",
+      "ms": 29,
+      "detail": ""
+    },
+    {
+      "label": "mobile_domcontentloaded",
+      "ms": 92,
+      "detail": ""
+    }
+  ],
+  "errors": [],
+  "readyState": "complete",
+  "url": "http://127.0.0.1:4396/",
+  "appCardCount": 4,
+  "pass": true
+}

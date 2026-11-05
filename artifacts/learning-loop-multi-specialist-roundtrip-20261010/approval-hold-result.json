@@ -1,0 +1,82 @@
+{
+  "pass": true,
+  "scenario": "TAKY MOBILE ㄱ -> READY 3 TASKS -> HIDE -> SNAP -> PLAY CAMP -> READY -> TAKY MOBILE VERIFIED",
+  "steps": {
+    "guest_ready_link": {
+      "href": "http://127.0.0.1:4351",
+      "workCreated": false,
+      "adminDataFetched": false
+    },
+    "mobile_work_created": true,
+    "mobile_dispatched": {
+      "workId": "learning-loop-1793534730768-9651eb",
+      "targets": 3
+    },
+    "ready_session": {
+      "session_id": "s_1793534732851",
+      "tasks": [
+        {
+          "id": "task_s_1793534732851_1",
+          "label": "영어 · 단어 apple 1개",
+          "suggested_app": "hide-seek"
+        },
+        {
+          "id": "task_s_1793534732851_2",
+          "label": "영어 · 문장 표현 1개",
+          "suggested_app": "snap-pop"
+        },
+        {
+          "id": "task_s_1793534732851_3",
+          "label": "영어 · CVC 소리 1개",
+          "suggested_app": "play-camp"
+        }
+      ]
+    },
+    "hide_done": true,
+    "snap_done": true,
+    "play_unapproved_guard": {
+      "linked": true,
+      "completed": false,
+      "submittedEvidence": 0,
+      "returnState": "PARTIAL",
+      "screenMessage": "글자를 눈으로 이어 봤어요. 소리 학습 발견은 승인 음원을 끝까지 들은 뒤 기록해요.",
+      "readyHold": {
+        "tasks": [
+          "COMPLETED",
+          "COMPLETED",
+          "PARTIAL"
+        ],
+        "origin": null,
+        "taskState": null
+      },
+      "sourceStatus": "DEV_PLACEHOLDER"
+    },
+    "ready_partial_receipt": {
+      "headline": "오늘 3개 탐험 · 2개 완료",
+      "taskRows": [
+        {
+          "state": "COMPLETED",
+          "text": "Hide & Seek\n영어 · 단어 apple 1개\n완료"
+        },
+        {
+          "state": "COMPLETED",
+          "text": "Snap & Pop\n영어 · 문장 표현 1개\n완료"
+        },
+        {
+          "state": "PARTIAL",
+          "text": "Play Camp\n영어 · CVC 소리 1개\n일부 남음"
+        }
+      ]
+    },
+    "mobile_partial_return": {
+      "work_state_label": "PARTIAL",
+      "work_receipt_received": true,
+      "has_unsafe_url_params": false
+    }
+  },
+  "gaps": [
+    "FULL_THREE_APP_COMPLETION_NEEDS_APPROVED_AUDIO_AND_REAL_DEVICE"
+  ],
+  "errors": [],
+  "verdict": "NEGATIVE_APPROVAL_GUARD_PASS_NOT_FULL_THREE_APP_COMPLETION"
+}

@@ -1,0 +1,65 @@
+{
+  "pass": true,
+  "scenario": "TAKY MOBILE ㄱ -> READY 3 TASKS -> HIDE -> SNAP -> PLAY CAMP -> READY -> TAKY MOBILE VERIFIED",
+  "steps": {
+    "mobile_work_created": true,
+    "mobile_dispatched": {
+      "workId": "learning-loop-1791733685947-38300d",
+      "targets": 3
+    },
+    "ready_session": {
+      "session_id": "s_1791733686892",
+      "tasks": [
+        {
+          "id": "task_s_1791733686892_1",
+          "label": "영어 · apple 1개",
+          "suggested_app": "hide-seek"
+        },
+        {
+          "id": "task_s_1791733686892_2",
+          "label": "영어 · 문장 표현 1개",
+          "suggested_app": "snap-pop"
+        },
+        {
+          "id": "task_s_1791733686892_3",
+          "label": "영어 · CVC 소리 1개",
+          "suggested_app": "play-camp"
+        }
+      ]
+    },
+    "hide_done": true,
+    "snap_done": true,
+    "play_done": true,
+    "ready_all_completed": {
+      "states": [
+        "COMPLETED",
+        "COMPLETED",
+        "COMPLETED"
+      ],
+      "planner": [
+        {
+          "id": "mobile-hide",
+          "status": "COMPLETED",
+          "source": "hide-seek"
+        },
+        {
+          "id": "mobile-snap",
+          "status": "COMPLETED",
+          "source": "snap-pop"
+        },
+        {
+          "id": "mobile-play",
+          "status": "COMPLETED",
+          "source": "play-camp"
+        }
+      ]
+    },
+    "mobile_verified": {
+      "state": "COMPLETED",
+      "receipt": "LEARNING_LOOP_RESULT_RECEIVED",
+      "returnParamsCleared": true
+    }
+  },
+  "gaps": [],
+  "errors": []
+}

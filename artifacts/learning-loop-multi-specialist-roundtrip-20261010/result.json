@@ -1,0 +1,44 @@
+{
+  "pass": false,
+  "scenario": "TAKY MOBILE ㄱ -> READY 3 TASKS -> HIDE -> SNAP -> PLAY CAMP -> READY -> TAKY MOBILE VERIFIED",
+  "steps": {
+    "guest_ready_link": {
+      "href": "http://127.0.0.1:4351",
+      "workCreated": false,
+      "adminDataFetched": false
+    },
+    "mobile_work_created": true,
+    "mobile_dispatched": {
+      "workId": "learning-loop-1792745792545-daee45",
+      "targets": 3
+    },
+    "ready_session": {
+      "session_id": "s_1792745794741",
+      "tasks": [
+        {
+          "id": "task_s_1792745794741_1",
+          "label": "영어 · 단어 apple 1개",
+          "suggested_app": "hide-seek"
+        },
+        {
+          "id": "task_s_1792745794741_2",
+          "label": "영어 · 문장 표현 1개",
+          "suggested_app": "snap-pop"
+        },
+        {
+          "id": "task_s_1792745794741_3",
+          "label": "영어 · CVC 소리 1개",
+          "suggested_app": "play-camp"
+        }
+      ]
+    },
+    "hide_done": true,
+    "snap_done": true
+  },
+  "gaps": [],
+  "errors": [
+    "HTTP_404:http://127.0.0.1:4350/__taky_qa_summary",
+    "HTTP_404:http://127.0.0.1:4350/__taky_qa_summary",
+    "page.waitForURL: Timeout 15000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"domcontentloaded\"\n  navigated to \"http://127.0.0.1:4331/?session_id=s_1792745794741&goal_id=goal_1792745794743_7klvl5&task_id=task_s_1792745794741_3&lap_id=lap_1792745800318_p9jllh&return_target=http%3A%2F%2F127.0.0.1%3A4351%2F%3Fhide_target%3Dhttp%253A%252F%252F127.0.0.1%253A4352%26snap_target%3Dhttp%253A%252F%252F127.0.0.1%253A4321%26play_camp_target%3Dhttp%253A%252F%252F127.0.0.1%253A4331%26taky_mobile_return_target%3Dhttp%253A%252F%252F127.0.0.1%253A4350%252F%253Fready_target%253Dhttp%25253A%25252F%25252F127.0.0.1%25253A4351%2526hide_target%253Dhttp%25253A%25252F%25252F127.0.0.1%25253A4352%2526snap_target%253Dhttp%25253A%25252F%25252F127.0.0.1%25253A4321%2526play_camp_target%253Dhttp%25253A%25252F%25252F127.0.0.1%25253A4331%26taky_mobile_work_id%3Dlearning-loop-1792745792545-daee45%26taky_mobile_nonce%3Dcb03a673-5a2f-4ac7-8358-e8a573133a02&continuity_version=1&state_owner=ready-set&child_id=mobile-multi-child&school_stage=E5&subject=%EC%98%81%EC%96%B4&timer_context=%7B%22version%22%3A1%2C%22owner%22%3A%22ready-set%22%2C%22startAt%22%3A1792745794741%2C%22targetMs%22%3Anull%2C%22targetAt%22%3Anull%2C%22pausedAt%22%3Anull%2C%22continuity%22%3A%7B%22version%22%3A1%2C%22owner%22%3A%22ready-set%22%2C%22provenance%22%3A%22READY_RUNTIME%22%2C%22intervals%22%3A%5B%5D%2C%22legacyExcludedMs%22%3A0%2C%22legacyIssueMs%22%3A0%2C%22legacySystemWaitMs%22%3A0%7D%2C%22issueState%22%3Anull%2C%22systemWaitState%22%3Anull%7D&paused_ms=0&pause_intervals=%5B%5D&issue_state=null&system_wait_state=null&snap_target=http%3A%2F%2F127.0.0.1%3A4321&target_time_ms=0&session_start_at=1792745794741&issue_ms=0&from_app=ready-set\"\n============================================================\n    at D:\\Git PWA\\TAKY-MOBILE\\tests\\learning-loop-multi-specialist-roundtrip-e2e.cjs:294:13"
+  ]
+}

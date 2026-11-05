@@ -1,0 +1,43 @@
+{
+  "pass": true,
+  "scenarios": {
+    "mobile-unreachable": {
+      "lanes": 6,
+      "releaseCalls": 1,
+      "guestIsolation": true,
+      "protectedCallsBeforeAuth": 0,
+      "overflow": 0
+    },
+    "mobile-auth-required": {
+      "primary": "auth",
+      "releaseCalls": 1,
+      "guestIsolation": true,
+      "protectedCallsBeforeAuth": 0,
+      "overflow": 0
+    },
+    "desktop-remote-verified": {
+      "canonical": "VERIFIED",
+      "release": "LIVE_VERIFIED",
+      "releaseCalls": 2,
+      "guestIsolation": true,
+      "protectedCallsBeforeAuth": 0,
+      "overflow": 0
+    },
+    "mobile-release-stale": {
+      "release": "HISTORICAL",
+      "releaseCalls": 1,
+      "guestIsolation": true,
+      "protectedCallsBeforeAuth": 0,
+      "overflow": 0
+    },
+    "local-qa-report": {
+      "passed": 39,
+      "gaps": 17,
+      "state": "UNVERIFIED"
+    },
+    "qa-off-localhost": {
+      "state": "PRIVATE_NOT_CONNECTED",
+      "requests": 0
+    }
+  }
+}
