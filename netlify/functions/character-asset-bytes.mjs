@@ -34,4 +34,5 @@ export async function handleAssetBytes(request, deps = {}) {
 }
 
 export default request => handleAssetBytes(request);
-export const config = { path: ASSET_BYTES_PATH };
+// Netlify reads config statically: the path must be a literal (same value as ASSET_BYTES_PATH).
+export const config = { path: '/api/family/character-asset-bytes' };
