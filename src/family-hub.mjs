@@ -115,7 +115,8 @@ export async function mountFamilyHub(root,{runtime=globalThis.TAKY_FAMILY_RUNTIM
     ]);
     if(ticket!==generation||root.dataset.familyGeneration!==mountVersion)return {ok:false,state:'SUPERSEDED'};
     detail.textContent=result.ok?`${result.display}${result.stage?' · '+result.stage:''} · 중앙 프로필 확인`:
-      '중앙 프로필을 확인하지 못했습니다. 개인 기록은 표시하지 않습니다.';
+      result.state==='PROFILE_NOT_FOUND'?'아직 등록된 프로필이 없어요. Ready & Set에서 프로필과 캐릭터를 만들면 여기에 표시돼요.':
+      '중앙 프로필을 불러오지 못했어요. 잠시 후 다시 열어 주세요.';
     root.dataset.memberState=result.ok?'CENTRAL_PROFILE_BOUND':result.state;
     root.dataset.learningState=learning.state;
     learningStatus.textContent=learning.ok
