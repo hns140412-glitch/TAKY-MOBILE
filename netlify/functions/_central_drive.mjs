@@ -33,16 +33,19 @@ export function createDriveClient({ clientId, clientSecret, refreshToken, fetchI
     return res;
   }
   const q = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-  async function find({ parent, name, appKey, appValue }) {
+  // props: extra exact appProperties matches. newest: newest-first, so a single page
+  // always holds the latest match however many older files exist.
+  async function find({ parent, name, appKey, appValue, props = {}, newest = false, pageSize = 10 }) {
     if (!ID.test(parent)) throw Error('CENTRAL_DRIVE_FOLDER_ID_INVALID');
     const parts = [q(parent) + ' in parents', 'trashed = false'];
     if (name) parts.push('name = ' + q(name));
-    if (appKey) parts.push('appProperties has { key=' + q(appKey) + ' and value=' + q(appValue) + ' }');
+    const all = { ...(appKey ? { [appKey]: appValue } : {}), ...props };
+    for (const [k, v] of Object.entries(all)) parts.push('appProperties has { key=' + q(k) + ' and value=' + q(v) + ' }');
     const u = new URL(API);
     u.searchParams.set('q', parts.join(' and '));
     u.searchParams.set('fields', 'files(id,name,version,mimeType,size,appProperties,createdTime)');
-    u.searchParams.set('orderBy', 'createdTime');
-    u.searchParams.set('pageSize', '10');
+    u.searchParams.set('orderBy', newest ? 'createdTime desc' : 'createdTime');
+    u.searchParams.set('pageSize', String(Math.min(Math.max(pageSize | 0, 1), 100)));
     return (await (await call('GET', u.href)).json()).files || [];
   }
   async function readText(id) {
@@ -185,10 +188,9 @@ export function createDriveCharacterObjectStore({ drive, folderId, secret, publi
       return { ok: true, sha256, etag: 'v' + done.version };
     },
     async createReadTicket({ asset_ref, expires_in_seconds }) {
-      const files = (await drive.find({ parent: folderId, appKey: 'taky_asset_sha', appValue: sha(asset_ref) }))
-        .filter(f => f.appProperties?.taky_committed === '1');
-      const f = files[files.length - 1];
-      if (!f) return null;
+      // Newest committed upload for this asset_ref, filtered server-side (no page-size blind spot).
+      const f = (await drive.find({ parent: folderId, appKey: 'taky_asset_sha', appValue: sha(asset_ref), props: { taky_committed: '1' }, newest: true, pageSize: 1 }))[0];
+      if (!f || f.appProperties?.taky_committed !== '1') return null;
       const e = exp(expires_in_seconds);
       return { read_url: url(signTicket(secret, { op: 'get', file_id: f.id, exp: e })), expires_at: new Date(e * 1000).toISOString() };
     },
@@ -197,6 +199,10 @@ export function createDriveCharacterObjectStore({ drive, folderId, secret, publi
       if (bytes.length !== claims.byte_size || sha(bytes) !== claims.sha256) return { ok: false, reason: 'ASSET_BYTES_MISMATCH' };
       const ext = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }[claims.content_type];
       if (!ext) return { ok: false, reason: 'ASSET_TYPE_NOT_ALLOWED' };
+      // A ticket is good for one upload: a replay of the same upload_id stores nothing new.
+      // (Drive has no unique constraint, so two truly simultaneous first redemptions could
+      // still both write; commit/read then pick one file and the bytes are identical.)
+      if ((await drive.find({ parent: folderId, appKey: 'taky_upload_id', appValue: claims.upload_id, pageSize: 1 }))[0]) return { ok: true, replay: true };
       await drive.create({ parent: folderId, name: 'taky-character-' + sha(claims.asset_ref).slice(0, 24) + '.' + ext, mime: claims.content_type, bytes,
         appProperties: { taky_asset_sha: sha(claims.asset_ref), taky_upload_id: claims.upload_id, taky_sha256: claims.sha256, taky_kind: 'character-asset' } });
       return { ok: true };

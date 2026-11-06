@@ -15,7 +15,7 @@ const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 function fakeDrive() {
   const files = new Map(); let n = 0; const log = [];
   const parseQ = q => ({ parent: /'([^']+)' in parents/.exec(q)?.[1], name: /name = '([^']+)'/.exec(q)?.[1],
-    app: /key='([^']+)' and value='([^']+)'/.exec(q) });
+    apps: [...q.matchAll(/key='([^']+)' and value='([^']+)'/g)] });
   function parseMultipart(buf, ct) {
     const boundary = /boundary=(.+)$/.exec(ct)[1]; const s = buf.toString('latin1');
     const parts = s.split('--' + boundary).slice(1, -1).map(p => p.slice(p.indexOf('\r\n\r\n') + 4, -2));
@@ -32,7 +32,10 @@ function fakeDrive() {
     const idm = /\/files\/([^/?]+)$/.exec(u.pathname);
     if (opt.method === 'GET' && u.pathname === '/drive/v3/files') {
       const q = parseQ(u.searchParams.get('q'));
-      const out = [...files.values()].filter(f => f.parents.includes(q.parent) && !f.trashed && (!q.name || f.name === q.name) && (!q.app || f.appProperties[q.app[1]] === q.app[2]));
+      let out = [...files.values()].filter(f => f.parents.includes(q.parent) && !f.trashed && (!q.name || f.name === q.name) && q.apps.every(a => f.appProperties[a[1]] === a[2]));
+      out.sort((a, b) => a.createdTime.localeCompare(b.createdTime));
+      if (u.searchParams.get('orderBy') === 'createdTime desc') out.reverse();
+      out = out.slice(0, Number(u.searchParams.get('pageSize') || 100)); // real Drive pages
       return ok({ files: out.map(({ bytes, ...m }) => m) });
     }
     if (opt.method === 'POST' && u.pathname === '/upload/drive/v3/files') {
@@ -160,6 +163,34 @@ await t('character photo: ticket upload -> Drive -> commit -> signed read', asyn
   assert.ok(stored && stored.parents[0] === FOLDER, 'image lives in family Drive folder');
   const otherFamily = await call('/api/family/character-asset', { body: { ...base, family_id: 'OTHER', action: 'RESOLVE_READ', asset_ref: j.asset_ref } });
   assert.equal(otherFamily.status, 403);
+  // Review finding (HIGH): an authorized scope must not unlock another member's/family's asset_ref.
+  const crossMember = await call('/api/family/character-asset', { body: { ...base, member_id: 'OWNER', action: 'RESOLVE_READ', asset_ref: j.asset_ref } });
+  assert.equal(crossMember.status, 403, 'OWNER scope cannot read CHILD asset_ref');
+  assert.equal((await crossMember.json()).reason, 'ASSET_REF_SCOPE_MISMATCH');
+  const crossChar = await call('/api/family/character-asset', { body: { ...base, character_id: 'other-char', action: 'RESOLVE_READ', asset_ref: j.asset_ref } });
+  assert.equal(crossChar.status, 403);
+  // Review finding (MEDIUM): replaying the upload ticket stores nothing new.
+  const before = [...drive.files.values()].filter(f => f.appProperties.taky_kind === 'character-asset').length;
+  const replay = await handleAssetBytes(new Request(j.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: png }), deps);
+  assert.equal(replay.status, 200);
+  assert.equal([...drive.files.values()].filter(f => f.appProperties.taky_kind === 'character-asset').length, before, 'replay created no file');
+});
+
+await t('character photo: newest committed version wins even after 12 uploads (no page blind spot)', async () => {
+  const base = { family_id: 'TAKY-HOME', member_id: 'CHILD', character_id: 'many' };
+  const deps = { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live };
+  let last, ref;
+  for (let i = 0; i < 12; i++) {
+    const img = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, i]), crypto.randomBytes(64)]);
+    const r = await call('/api/family/character-asset', { body: { ...base, action: 'CREATE_UPLOAD', content_type: 'image/png', byte_size: img.length, sha256: sha(img), asset_version: 'v1' } });
+    const j = await r.json(); ref = j.asset_ref;
+    assert.equal((await handleAssetBytes(new Request(j.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: img }), deps)).status, 200);
+    assert.equal((await call('/api/family/character-asset', { body: { ...base, action: 'COMMIT_UPLOAD', asset_ref: ref, upload_id: j.upload_id, sha256: sha(img) } })).status, 200);
+    last = img;
+  }
+  const rr = await (await call('/api/family/character-asset', { body: { ...base, action: 'RESOLVE_READ', asset_ref: ref } })).json();
+  const got = await handleAssetBytes(new Request(rr.read_url), deps);
+  assert.equal(sha(Buffer.from(await got.arrayBuffer())), sha(last), 'latest committed image is served');
 });
 
 await t('learning evidence stays fail-closed (no browser claim becomes evidence)', async () => {

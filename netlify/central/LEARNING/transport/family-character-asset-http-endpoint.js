@@ -32,6 +32,7 @@ function create({verifyBearerToken,objectStore}={}){
    return response(200,{ok:true,asset_ref,upload_id:String(ticket.upload_id),upload_url:String(ticket.upload_url),expires_at:ticket.expires_at||null});
   }
   const asset_ref=clean(input.asset_ref);if(!Store.validAssetRef(asset_ref))return fail(400,'PRIVATE_ASSET_REF_REQUIRED');
+  if(!Store.assetRefInScope(asset_ref,{scope_id:family_id,member_id,character_id}))return fail(403,'ASSET_REF_SCOPE_MISMATCH');
   if(input.action==='COMMIT_UPLOAD'){
    const upload_id=clean(input.upload_id),sha256=clean(input.sha256).toLowerCase();if(!upload_id||!SHA.test(sha256))return fail(400,'ASSET_COMMIT_METADATA_INVALID');
    let committed;try{committed=await objectStore.commitUpload({asset_ref,upload_id,sha256})}catch{return fail(503,'ASSET_COMMIT_UNAVAILABLE')}

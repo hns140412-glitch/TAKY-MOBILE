@@ -5,7 +5,7 @@
 // 3) Writes the server env to the taky-mobile Netlify site with the netlify CLI (secrets never printed).
 // Usage:
 //   node tools/bootstrap-central-drive.mjs --client-env "D:\Git PWA\SAVEY\.env.local" \
-//     --members C:\TAKY_CENTRAL_LOCAL\members.json [--folder <id>] [--site taky-mobile] [--no-netlify]
+//     --members C:\TAKY_CENTRAL_LOCAL\members.json [--folder <id>] [--site taky-mobile --site-id <uuid>] [--no-netlify]
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -22,6 +22,11 @@ const clientSecret = process.env.TAKY_DRIVE_OAUTH_CLIENT_SECRET || fileEnv.GOOGL
 if (!clientId || !clientSecret) { console.error('DESKTOP_OAUTH_CLIENT_MISSING (pass --client-env with GOOGLE_CLIENT_ID/SECRET)'); process.exit(2); }
 const account = arg('account', 'siezeall@gmail.com');
 const site = arg('site', 'taky-mobile');
+const siteId = arg('site-id', site === 'taky-mobile' ? '8d30705d-766c-4953-83a9-fed5ede1881e' : '');
+if (!flag('no-netlify')) { // fail before consent, not after
+  let linked = ''; try { linked = JSON.parse(fs.readFileSync('.netlify/state.json', 'utf8')).siteId || ''; } catch {}
+  if (!/^[0-9a-f-]{36}$/.test(siteId) || linked !== siteId) { console.error('LINKED_SITE_MISMATCH linked=' + (linked || 'none') + ' expected=' + (siteId || 'none')); process.exit(2); }
+}
 
 const verifier = crypto.randomBytes(32).toString('base64url');
 const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -72,10 +77,12 @@ if (membersPath) {
 }
 if (!flag('no-netlify')) {
   // Run from a folder linked to the taky-mobile site (.netlify/state.json). No shell: values are passed verbatim.
+  // Secrets go only to the explicitly named site id, and only if this folder is linked to that same site.
   const state = JSON.parse(fs.readFileSync('.netlify/state.json', 'utf8'));
-  if (!state.siteId) throw Error('RUN_FROM_A_FOLDER_LINKED_TO_' + site);
+  if (!/^[0-9a-f-]{36}$/.test(siteId)) throw Error('SITE_ID_REQUIRED (--site-id <uuid>)');
+  if (state.siteId !== siteId) throw Error('LINKED_SITE_MISMATCH linked=' + (state.siteId || 'none') + ' expected=' + siteId + ' (' + site + ')');
   const cli = path.join(execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['root', '-g'], { shell: process.platform === 'win32' }).toString().trim(), 'netlify-cli', 'bin', 'run.js');
-  const set = (k, v) => execFileSync(process.execPath, [cli, 'env:set', k, v, '--force'], { stdio: ['ignore', 'ignore', 'inherit'] });
+  const set = (k, v) => execFileSync(process.execPath, [cli, 'env:set', k, v, '--force', '--site', siteId], { stdio: ['ignore', 'ignore', 'inherit'] });
   set('TAKY_DRIVE_OAUTH_CLIENT_ID', clientId);
   set('TAKY_DRIVE_OAUTH_CLIENT_SECRET', clientSecret);
   set('TAKY_DRIVE_OAUTH_REFRESH_TOKEN', refreshToken);
