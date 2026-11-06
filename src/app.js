@@ -2,6 +2,7 @@ import { deriveOperations, renderOperationsStrip, renderOperationsConsole } from
 import { adminSession, adminLogin, adminLogout, readAdminProgress, renderAdminProgress } from './admin-progress.mjs';
 import { loadAppState, saveAppState } from './db.js';
 import { mountFamilyHub } from './family-hub.mjs';
+import { mountCharacterRequests } from './character-requests.mjs';
 import { createFamilySignin } from './family-signin.mjs';
 import { routeIntent, commandToIntent } from './intent.js';
 import { loadCanonical, canonicalSummary } from './canonical.js';
@@ -743,7 +744,7 @@ async function init() {
   bindAdminProgress();
   await checkAdminSession();
   createFamilySignin().mount();
-  const refreshFamily=()=>void mountFamilyHub(document.getElementById('familyHub')).catch(error=>console.warn('Family hub unavailable',String(error)));
+  const refreshFamily=()=>{const hub=document.getElementById('familyHub');void mountFamilyHub(hub).catch(error=>console.warn('Family hub unavailable',String(error))).then(()=>mountCharacterRequests(hub)).catch(error=>console.warn('Character requests unavailable',String(error)));};
   refreshFamily();
   window.addEventListener('taky-central-auth-ready',refreshFamily);
   window.addEventListener('taky-central-auth-cleared',refreshFamily);

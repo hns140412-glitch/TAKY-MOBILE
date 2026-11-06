@@ -55,7 +55,7 @@ function fakeDrive() {
       if (u.searchParams.get('alt') === 'media') return ok(f.bytes);
       const { bytes: _b, ...m } = f; return ok(m);
     }
-    if (opt.method === 'DELETE' && idm) { files.delete(decodeURIComponent(idm[1])); return ok('', 204); }
+    if (opt.method === 'DELETE' && idm) { files.delete(decodeURIComponent(idm[1])); return new Response(null, { status: 204 }); }
     throw Error('unexpected ' + opt.method + ' ' + url);
   }
   return { files, fetchImpl, log, seed(name, obj) { const f = { id: 'seed_' + name, name, parents: [FOLDER], mimeType: 'application/json', appProperties: {}, version: '1', createdTime: new Date(0).toISOString(), bytes: Buffer.from(JSON.stringify(obj)) }; files.set(f.id, f); } };
@@ -205,6 +205,45 @@ await t('Drive token failure -> 503/401 without leaking secrets', async () => {
   const text = await r.text();
   assert.ok(r.status === 401 || r.status === 503, r.status + text);
   assert.ok(!text.includes('csecret') && !text.includes('refresh-revoked'));
+});
+
+await t('character request: child photo -> parent list/read -> complete deletes photo (no paid API)', async () => {
+  const { characterRequestFor } = await import('../netlify/functions/character-request.mjs');
+  const rq = characterRequestFor(ORIGIN, { config, fetchImpl: drive.fetchImpl, oauth2Client });
+  const deps = { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live };
+  const post = (body, token = 'token-parent-aaaaaaaaaaaa') => rq.handle(new Request(ORIGIN + '/api/family/character-request', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  const photo = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), crypto.randomBytes(4000)]);
+  const meta = { family_id: 'TAKY-HOME', member_id: 'CHILD', content_type: 'image/jpeg', byte_size: photo.length, sha256: sha(photo) };
+  assert.equal((await post({ ...meta, action: 'CREATE' }, 'token-stranger-aaaaaaaaaa')).status, 403, 'valid Google account outside the family');
+  assert.equal((await post({ ...meta, action: 'CREATE' }, 'token-forged-aaaaaaaaaaa')).status, 401);
+  assert.equal((await post({ ...meta, member_id: 'SPOUSE', action: 'CREATE' })).status, 403);
+  const putPhoto = async () => { const j = await (await post({ ...meta, action: 'CREATE' })).json(); assert.ok(j.upload_url, JSON.stringify(j));
+    const r = await handleAssetBytes(new Request(j.upload_url, { method: 'PUT', headers: { Origin: ORIGIN, 'Content-Type': 'image/jpeg' }, body: photo }), deps);
+    assert.equal(r.status, 200, await r.clone().text()); return j.request_id; };
+  await putPhoto(); const rid = await putPhoto(); // second photo replaces the first pending one
+  let j = await (await post({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' })).json();
+  assert.equal(j.pending, true); assert.equal(j.request_id, rid);
+  j = await (await post({ family_id: 'TAKY-HOME', action: 'LIST' })).json();
+  assert.equal(j.requests.length, 1, 'one open request per member'); assert.equal(j.requests[0].member_id, 'CHILD');
+  const img = await handleAssetBytes(new Request(j.requests[0].photo_url, { method: 'GET', headers: { Origin: ORIGIN } }), deps);
+  assert.equal(sha(Buffer.from(await img.arrayBuffer())), sha(photo), 'parent sees the exact photo');
+  // the source photo can never be read through the character-asset (master) route
+  const asMaster = await call('/api/family/character-asset', { body: { family_id: 'TAKY-HOME', member_id: 'CHILD', character_id: 'ready-explorer', action: 'RESOLVE_READ', asset_ref: 'taky-character:TAKY-HOME:CHILD:ready-explorer:' + rid } });
+  assert.equal(asMaster.status, 404);
+  assert.equal((await post({ family_id: 'TAKY-HOME', action: 'COMPLETE', request_id: rid })).status, 200);
+  assert.equal([...drive.files.values()].filter(f => f.appProperties.taky_kind === 'source-photo').length, 0, 'source photo deleted');
+  j = await (await post({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' })).json(); assert.equal(j.pending, false);
+  assert.equal((await post({ family_id: 'TAKY-HOME', action: 'COMPLETE', request_id: rid })).status, 404);
+});
+await t('character request: a non-parent member cannot list or approve', async () => {
+  const { createCharacterRequestHandler } = await import('../netlify/functions/_character_request.mjs');
+  const h = createCharacterRequestHandler({ verifyIdToken: async () => 'kid-sub', allowedOrigins: [ORIGIN],
+    lookupMemberships: async () => [{ family_id: 'TAKY-HOME', self_member_id: 'CHILD', role: 'CHILD', status: 'ACTIVE' }],
+    store: { list: async () => [], close: async () => ({ ok: true }), status: async () => ({ pending: false }), uploadTicket: () => ({}) } });
+  const req = body => h(new Request(ORIGIN + '/x', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer token-kid-aaaaaaaaaaaaaa', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+  assert.equal((await req({ family_id: 'TAKY-HOME', action: 'LIST' })).status, 403);
+  assert.equal((await req({ family_id: 'TAKY-HOME', action: 'COMPLETE', request_id: 'req_' + 'a'.repeat(24) })).status, 403);
+  assert.equal((await req({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' })).status, 200);
 });
 
 // Cross-repo contract: Ready & Set's Character Master publisher against THESE real handlers.

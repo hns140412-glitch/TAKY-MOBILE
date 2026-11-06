@@ -2,6 +2,7 @@
 // PUT = upload character image bytes to the family Drive folder; GET = read them back.
 import { centralFor, readCentralConfig, notConfigured } from './_central_host.mjs';
 import { verifyTicket, MAX_ASSET_BYTES, ASSET_BYTES_PATH } from './_central_drive.mjs';
+import { characterRequestFor } from './character-request.mjs';
 
 const json = (status, body, extra = {}) => new Response(JSON.stringify(body), { status,
   headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff', ...extra } });
@@ -17,6 +18,24 @@ export async function handleAssetBytes(request, deps = {}) {
   if (request.method === 'OPTIONS') return reqOrigin ? new Response(null, { status: 204, headers: cors }) : json(404, { ok: false, reason: 'PREFLIGHT_NOT_ALLOWED' });
   const claims = verifyTicket(config.ticketSecret, new URL(request.url).searchParams.get('t'));
   if (!claims) return json(401, { ok: false, reason: 'ASSET_TICKET_INVALID' }, cors);
+  // Character request source photos (private; deleted when the parent completes or rejects).
+  if (claims.op === 'put_src' || claims.op === 'get_src') {
+    const rq = characterRequestFor(origin, { config, fetchImpl: deps.fetchImpl, oauth2Client: deps.oauth2Client });
+    if (!rq.ok) return notConfigured(rq.missing);
+    if (request.method === 'PUT' && claims.op === 'put_src') {
+      if ((request.headers.get('content-type') || '').toLowerCase() !== claims.content_type) return json(415, { ok: false, reason: 'ASSET_CONTENT_TYPE_MISMATCH' }, cors);
+      const bytes = Buffer.from(await request.arrayBuffer());
+      if (bytes.length > MAX_ASSET_BYTES) return json(413, { ok: false, reason: 'ASSET_TOO_LARGE' }, cors);
+      let r; try { r = await rq.store.putSource(claims, bytes); } catch (e) { if (process.env.TAKY_TEST_DEBUG) console.error(e); return json(503, { ok: false, reason: 'ASSET_STORE_UNAVAILABLE' }, cors); }
+      return r.ok ? json(200, { ok: true, request_id: claims.request_id }, cors) : json(409, { ok: false, reason: r.reason }, cors);
+    }
+    if (request.method === 'GET' && claims.op === 'get_src') {
+      let r; try { r = await rq.store.getSource(claims); } catch { return json(503, { ok: false, reason: 'ASSET_STORE_UNAVAILABLE' }, cors); }
+      if (!r) return json(404, { ok: false, reason: 'ASSET_NOT_AVAILABLE' }, cors);
+      return new Response(r.bytes, { status: 200, headers: { 'Content-Type': r.contentType, 'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff', ...cors } });
+    }
+    return json(405, { ok: false, reason: 'ASSET_METHOD_NOT_ALLOWED' }, cors);
+  }
   if (request.method === 'PUT' && claims.op === 'put') {
     if ((request.headers.get('content-type') || '').toLowerCase() !== claims.content_type) return json(415, { ok: false, reason: 'ASSET_CONTENT_TYPE_MISMATCH' }, cors);
     if (Number(request.headers.get('content-length')) > MAX_ASSET_BYTES) return json(413, { ok: false, reason: 'ASSET_TOO_LARGE' }, cors);
