@@ -29,7 +29,13 @@ export default async request=>{
   headModifiedReachableSources:num(d.counts?.headModifiedReachableSources),
   runtimeAssetsChecked:nullableCount(d.counts?.runtimeAssetsChecked),
   runtimeAssetsMissing:nullableCount(d.counts?.runtimeAssetsMissing),
-  runtimeAssetsUnversioned:nullableCount(d.counts?.runtimeAssetsUnversioned)},
+  runtimeAssetsUnversioned:nullableCount(d.counts?.runtimeAssetsUnversioned),
+  aiJobsSignedTransportOnly:nullableCount(d.counts?.aiJobsSignedTransportOnly),
+  aiJobsSignedExecutionEvidence:nullableCount(d.counts?.aiJobsSignedExecutionEvidence),
+  aiJobsIndependentlyComplete:nullableCount(d.counts?.aiJobsIndependentlyComplete),
+  aiJobsSignedHandoffState:safeEnum(d.counts?.aiJobsSignedHandoffState,[
+   'EXACT_SIGNED_HANDOFFS_RECONCILED_NOT_COMPLETION',
+   'HOLD_SIGNED_HANDOFF_NOT_VERIFIED','NOT_CANONICAL_SCOPE_NO_HISTORY_READ'])},
  coverage:{historicalChats:num(d.coverage?.historicalChats),octoberNativeChats:num(d.coverage?.octoberNativeChats),claim:'ACCOUNT_HISTORY_NOT_COMPLETE'},
  pipeline:d.pipeline&&typeof d.pipeline==='object'?{
    notionTotal:num(d.pipeline.notionTotal),notionTextStaged:num(d.pipeline.notionTextStaged),
@@ -48,7 +54,14 @@ export default async request=>{
    logicalDuplicateUrls:num(d.pipeline.logicalDuplicateUrls),
    identicalEvidenceDuplicateCandidates:num(d.pipeline.identicalEvidenceDuplicateCandidates),
    differentRawDuplicateHolds:num(d.pipeline.differentRawDuplicateHolds),
-   duplicateCandidateAgeHours:Number.isFinite(d.pipeline.duplicateCandidateAgeHours)&&d.pipeline.duplicateCandidateAgeHours>=0?d.pipeline.duplicateCandidateAgeHours:null
+   duplicateCandidateAgeHours:Number.isFinite(d.pipeline.duplicateCandidateAgeHours)&&d.pipeline.duplicateCandidateAgeHours>=0?d.pipeline.duplicateCandidateAgeHours:null,
+   siteWatchRawProvenanceSources:nullableCount(d.pipeline.siteWatchRawProvenanceSources),
+   siteWatchCodexEvidenceCandidates:nullableCount(d.pipeline.siteWatchCodexEvidenceCandidates),
+   siteWatchFormalBilateralComplete:nullableCount(d.pipeline.siteWatchFormalBilateralComplete),
+   siteWatchFinalOwnerApproval:nullableCount(d.pipeline.siteWatchFinalOwnerApproval),
+   siteWatchGateState:safeEnum(d.pipeline.siteWatchGateState,[
+      'SITE_RAW_AND_CODEX_CANDIDATES_NOT_FORMALLY_APPROVED',
+      'HOLD_SITE_OWNER_EVIDENCE_UNVERIFIED'])
  }:null,
  qa:d.qa?.source==='LOCAL_SYNTHETIC_QA_RECEIPT_NOT_PRODUCTION'&&
    Array.isArray(d.qa.gaps)&&d.qa.gaps.length<=100&&
@@ -91,6 +104,27 @@ export default async request=>{
    doneGateRecords:num(d.kernel.doneGateRecords),exactWorkLinks:num(d.kernel.exactWorkLinks)
  }:null,
  operator:d.operator&&typeof d.operator==='object'?{
+   reasonExecutor:{
+     state:safeEnum(d.operator.reason_executor?.state,[
+       'HOLD_REASON_EXECUTOR_STATUS_UNVERIFIED',
+       'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE',
+       'LIVE_DUAL_AGENT_SESSIONS_VISIBLE_NOT_OWNERSHIP_VERIFIED']),
+     claudeLive:d.operator.reason_executor?.claude_live===true,
+     codexLive:d.operator.reason_executor?.codex_live===true,
+     bilateralLive:d.operator.reason_executor?.bilateral_live===true,
+     cliShellSessions:nullableCount(d.operator.reason_executor?.cli_shell_sessions),
+     modelStarted:false},
+   reasonGuided:{
+     state:safeEnum(d.operator.reason_guided?.state,[
+       'LAST_REASON_HANDOFF_PROVEN_BY_IMMUTABLE_RECEIPT',
+       'NO_REPRODUCIBLE_REASON_WORK_RECEIPT']),
+     taskId:['CLN-001','CLN-002','INT-001','MCP-001','MCP-002',
+       'SKL-001','CLN-009','FAMILY-DURABLE-001','OPS-001']
+       .includes(d.operator.reason_guided?.task_id)
+       ?d.operator.reason_guided.task_id:null,
+     resultState:safeEnum(d.operator.reason_guided?.result_state,[
+       'LOCAL_SLICE_VERIFIED_NOT_PORTFOLIO_DONE','LOCAL_SLICE_FINDINGS_NEED_ACTION']),
+     userDone:false,modelCalls:0},
    localExecution:{
      status:safeEnum(d.operator.local_execution?.status,
        ['REFRESHED_SHA_VERIFIED','SKIPPED_ALREADY_RUNNING','LOCAL_EXECUTOR_TIMEOUT_HOLD','EXPORTER_TIMEOUT_HOLD','EXPORTER_NONZERO_HOLD','RECONCILE_VALIDATION_HOLD','NO_STATUS_EVIDENCE']),

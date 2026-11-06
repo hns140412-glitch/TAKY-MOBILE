@@ -65,6 +65,12 @@ Configure these environment variables in Netlify, never in client JS or committe
 - optional `TAKY_CANONICAL_REF` = defaults to `main`
 - optional `TAKY_CANONICAL_FILES` = comma-separated override list
 
+Read-only release status (`/.netlify/functions/release-status`, GET, owner session required):
+- reuses `GITHUB_TOKEN` to read the head commit of `TAKY_RELEASE_REPO` (default `hns140412-glitch/TAKY-MOBILE`) @ `TAKY_RELEASE_REF` (default `main`)
+- optional `NETLIFY_AUTH_TOKEN` + `NETLIFY_SITE_ID` (falls back to Netlify's `SITE_ID`) to read the site's published deploy; if missing the gateway returns `NOT_CONNECTED`, never a recorded deploy as live
+- returns only validated ids/times; no provider bodies, URLs or secrets; never writes or triggers a deploy
+- client labels: `LIVE_VERIFIED` (fresh, < 10 min) / `HISTORICAL` (stale or reused after failure) / `AUTH_REQUIRED` / `UNAVAILABLE`
+
 Default files loaded:
 - `TAKY.md`
 - `MASTER/MASTER_LOGIC.md`

@@ -1,0 +1,11 @@
+page.goto: Timeout 12000ms exceeded.
+Call log:
+  - navigating to "http://127.0.0.1:4350/?ready_target=http%3A%2F%2F127.0.0.1%3A4351%2F&hide_target=http%3A%2F%2F127.0.0.1%3A4352%2F&snap_target=http%3A%2F%2F127.0.0.1%3A4321%2F&play_camp_target=http%3A%2F%2F127.0.0.1%3A4331%2F", waiting until "domcontentloaded"
+
+    at D:\Git PWA\TAKY-MOBILE\tests\learning-loop-multi-specialist-roundtrip-e2e.cjs:74:13 {
+  log: [
+    '  - navigating to "http://127.0.0.1:4350/?ready_target=http%3A%2F%2F127.0.0.1%3A4351%2F&hide_target=http%3A%2F%2F127.0.0.1%3A4352%2F&snap_target=http%3A%2F%2F127.0.0.1%3A4321%2F&play_camp_target=http%3A%2F%2F127.0.0.1%3A4331%2F", waiting until "domcontentloaded"'
+  ],
+  name: 'TimeoutError'
+}
+

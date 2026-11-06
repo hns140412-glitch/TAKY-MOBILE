@@ -77,6 +77,8 @@ try{
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(String(e)));
   await page.goto(base);
+  await page.waitForFunction(()=>document.documentElement.dataset.takyFamilySigninReady==='true');
+  assert.equal(await page.locator('#familySignInBtn').isEnabled(),true);
   await page.getByRole('button',{name:'Google 가족 로그인'}).click();
   if(c.config==='valid'){
    await page.locator('#simulatedGoogleButton').waitFor();
