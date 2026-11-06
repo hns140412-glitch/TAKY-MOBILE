@@ -54,8 +54,9 @@ let folderId = arg('folder');
 if (!folderId) {
   const r = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', { method: 'POST', headers: { Authorization: 'Bearer ' + await drive.token(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'TAKY_FAMILY_CENTRAL', mimeType: 'application/vnd.google-apps.folder', appProperties: { taky_kind: 'family-central-root' } }) });
-  folderId = (await r.json()).id;
-  if (!folderId) throw Error('FOLDER_CREATE_FAILED');
+  const made = await r.json();
+  folderId = made.id;
+  if (!folderId) throw Error('FOLDER_CREATE_FAILED ' + r.status + ' ' + (made.error?.message || '').slice(0, 300));
 }
 console.log('FOLDER ' + folderId);
 const membersPath = arg('members');
