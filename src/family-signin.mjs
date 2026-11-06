@@ -41,9 +41,11 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   options:document.getElementById('familyChooseTarget'),status:document.getElementById('familyLoginStatus'),
   signout:document.getElementById('familySignOutBtn')});
  const MARK='taky.familySignin.resume';
- const markGet=()=>{try{return globalThis.sessionStorage?.getItem(MARK)==='1'}catch{return false}};
- const markSet=()=>{try{globalThis.sessionStorage?.setItem(MARK,'1')}catch{}};
- const markClear=()=>{try{globalThis.sessionStorage?.removeItem(MARK)}catch{}};
+ // Non-secret "was signed in on this device" flag only. It never holds a token or identity;
+ // it lets the next visit ask Google for a FRESH credential automatically (One Tap auto-select).
+ const markGet=()=>{try{return globalThis.localStorage?.getItem(MARK)==='1'}catch{return false}};
+ const markSet=()=>{try{globalThis.localStorage?.setItem(MARK,'1')}catch{}};
+ const markClear=()=>{try{globalThis.localStorage?.removeItem(MARK);globalThis.sessionStorage?.removeItem(MARK)}catch{}};
  const say=value=>{const {status}=dom();if(status)status.textContent=value;};
  const resetView=()=>{const x=dom();x.google?.replaceChildren();x.options?.replaceChildren();if(x.signout)x.signout.hidden=true;
   if(x.action)x.action.hidden=false};
@@ -65,12 +67,12 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   // Testable readiness means handlers are bound, NOT that anyone is signed in.
   document.documentElement.dataset.takyFamilySigninReady='true';
   // Non-secret marker only: ask for Google sign-in again once; never reuse identity.
-  if(markGet()&&!globalThis.TAKY_FAMILY_RUNTIME&&!installed)void begin().then(r=>{
-   if(r.state==='GOOGLE_BUTTON_READY')say('페이지가 이동되어 가족 로그인이 해제되었습니다. 다시 확인하려면 Google 로그인 버튼을 누르세요. 재인증이 필요할 수 있습니다.');
+  if(markGet()&&!globalThis.TAKY_FAMILY_RUNTIME&&!installed)void begin({resume:true}).then(r=>{
+   if(r.state==='GOOGLE_BUTTON_READY'&&!installed)say('가족 로그인을 다시 연결하는 중이에요. 자동으로 안 되면 Google 로그인 버튼을 눌러 주세요.');
   });
   return {ok:true};
  };
- async function begin(){
+ async function begin({resume=false}={}){
   if(pending)return {ok:false,state:'SIGNIN_ALREADY_IN_PROGRESS'};
   if(installed)return {ok:true,state:'ALREADY_SIGNED_IN'};
   const ticket=++epoch;pending=true;resetView();say('가족 로그인 설정 확인 중…');
@@ -84,12 +86,14 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
    const sdk=await googleSdk();
    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
    if(!sdk||typeof sdk.initialize!=='function'||typeof sdk.renderButton!=='function')throw Error('GOOGLE_LOGIN_UNAVAILABLE');
-   sdk.initialize({client_id:config.googleClientId,auto_select:false,
+   sdk.initialize({client_id:config.googleClientId,auto_select:resume,use_fedcm_for_prompt:true,
     callback:response=>void acceptCredential(response?.credential,central,ticket)});
    const target=dom().google;
    if(!target)throw Error('GOOGLE_BUTTON_MISSING');
    sdk.renderButton(target,{theme:'outline',size:'large',text:'signin_with',shape:'pill'});
    say('Google 계정으로 로그인하세요. 가족 권한은 중앙 서버에서 확인합니다.');
+   // Returning device: ask Google for a fresh credential without a click. The server still verifies it.
+   if(resume&&typeof sdk.prompt==='function'){try{sdk.prompt()}catch{}}
    return {ok:true,state:'GOOGLE_BUTTON_READY'};
   }catch{
    if(ticket===epoch){resetView();say('중앙 로그인 설정 또는 Google 연결이 없어 로그인할 수 없습니다.');}
