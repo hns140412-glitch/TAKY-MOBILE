@@ -246,30 +246,47 @@ await t('character request: a non-parent member cannot list or approve', async (
   assert.equal((await req({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' })).status, 200);
 });
 
-// Cross-repo contract: Ready & Set's Character Master publisher against THESE real handlers.
+// Cross-repo contract: Ready & Set's no-cost character request against THESE real handlers + TAKY Mobile's parent approval.
 // Run with READY_CHARACTER_SYNC_MODULE=<path to Ready rs/rs-taky-character-sync.js>; skipped otherwise.
-if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready character master publish -> real central (asset + character profile)', async () => {
+if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> parent approves in TAKY Mobile -> Ready reads the master back', async () => {
   const { createRequire } = await import('node:module');
   const Sync = createRequire(import.meta.url)(process.env.READY_CHARACTER_SYNC_MODULE);
+  const { approveRequest } = await import('../src/character-requests.mjs');
   const deps = { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live };
+  const { characterRequestFor: crqFor } = await import('../netlify/functions/character-request.mjs');
+  const crq = crqFor(ORIGIN, { config, fetchImpl: drive.fetchImpl, oauth2Client });
   const fetchImpl = async (url, opt = {}) => {
-    const req = new Request(url, { method: opt.method, headers: { Origin: ORIGIN, ...(opt.headers || {}) }, body: opt.body });
-    return new URL(url).pathname === '/api/family/character-asset-bytes' ? handleAssetBytes(req, deps) : runNodeBridge(c.host.handler, req);
+    const req = new Request(url, { method: opt.method || 'GET', headers: { Origin: ORIGIN, ...(opt.headers || {}) }, body: opt.body });
+    const p = new URL(url).pathname;
+    if (p === '/api/family/character-request') return crq.handle(req);
+    return p === '/api/family/character-asset-bytes' ? handleAssetBytes(req, deps) : runNodeBridge(c.host.handler, req);
   };
+  const listReq = async () => (await fetchImpl(ORIGIN + '/api/family/character-request', { method: 'POST',
+    headers: { Authorization: 'Bearer token-parent-aaaaaaaaaaaa', 'Content-Type': 'application/json' }, body: JSON.stringify({ family_id: 'TAKY-HOME', action: 'LIST' }) })).json();
   const runtime = { apiBaseUrl: ORIGIN + '/', getToken: async () => 'token-parent-aaaaaaaaaaaa', getFamilyId: async () => 'TAKY-HOME',
     currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER'] }) };
-  const img = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), crypto.randomBytes(3000)]).toString('base64');
-  const out = await Sync.publishMaster({ image: img, runtime, fetchImpl });
-  assert.equal(out.ok, true, JSON.stringify(out)); assert.equal(out.state, 'REGISTRY_BOUND');
-  const r = await call('/api/family/character-profile', { body: { family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'GET' } });
-  const j = await r.json(); assert.equal(j.found, true, JSON.stringify(j));
-  assert.equal(j.projection.character_id, 'ready-explorer'); assert.equal(j.projection.master_sha256, out.master_sha256);
-  const read = await call('/api/family/character-asset', { body: { family_id: 'TAKY-HOME', member_id: 'CHILD', character_id: 'ready-explorer', action: 'RESOLVE_READ', asset_ref: j.projection.master_asset_ref } });
-  const rj = await read.json(); assert.equal(read.status, 200, JSON.stringify(rj));
-  const bytes = Buffer.from(await (await handleAssetBytes(new Request(rj.read_url, { method: 'GET', headers: { Origin: ORIGIN } }), deps)).arrayBuffer());
-  assert.equal(sha(bytes), out.master_sha256, 'master read back byte-identical');
-  const again = await Sync.publishMaster({ image: img, runtime, fetchImpl });
-  assert.equal(again.identity_version, out.identity_version + 1, 'monotonic identity_version');
+  assert.equal(typeof Sync.publishMaster, 'undefined', 'Ready must not publish a master itself');
+  const before = await Sync.characterStatus({ runtime, fetchImpl });
+  const prevVersion = before.version || 0;
+  const photo = 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), crypto.randomBytes(2000)]).toString('base64');
+  const sent = await Sync.requestCharacter({ photo, runtime, fetchImpl });
+  assert.equal(sent.ok, true, JSON.stringify(sent)); assert.equal(sent.state, 'REQUESTED');
+  const waiting = await Sync.characterStatus({ runtime, fetchImpl });
+  assert.match(waiting.state, /^(REQUESTED|MASTER_READY_NEW_REQUEST)$/, JSON.stringify(waiting));
+  const list = await listReq();
+  const rq = list.requests.find(r => r.member_id === 'CHILD'); assert.ok(rq, JSON.stringify(list));
+  const masterBytes = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), crypto.randomBytes(4000)]);
+  const file = new File([masterBytes], 'master.png', { type: 'image/png' });
+  const ok = await approveRequest({ runtime, fetchImpl, request: rq, file });
+  assert.equal(ok.ok, true, JSON.stringify(ok)); assert.equal(ok.identity_version, prevVersion + 1);
+  const done = await Sync.characterStatus({ runtime, fetchImpl });
+  assert.equal(done.state, 'MASTER_READY', JSON.stringify({ ...done, image: !!done.image }));
+  assert.equal(done.version, prevVersion + 1); assert.equal(done.sha256, sha(masterBytes));
+  assert.equal(sha(Buffer.from(done.image.split(',')[1], 'base64')), sha(masterBytes), 'Ready gets the approved image byte-identical');
+  const after = await listReq();
+  assert.equal(after.requests.filter(r => r.member_id === 'CHILD').length, 0, 'source photo deleted on approval');
+  const none = await Sync.requestCharacter({ photo, runtime: null, fetchImpl });
+  assert.equal(none.state, 'PENDING_TAKY_SESSION', 'no session -> nothing sent');
 });
 
 console.log(`central functions: ${passed} passed`);
