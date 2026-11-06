@@ -20,6 +20,8 @@ function prepare(input={}, independentIndexOwnerVerifier=null){
   if(typeof independentIndexOwnerVerifier!=='function')issues.push('INDEX_OWNER_VERIFIER_NOT_CONFIGURED');
 
   const normalized=[];
+  const sourceIds=new Set();
+  const sourceRefs=new Set();
   for(const [index,row] of candidates.entries()){
     if(!row||typeof row!=='object'){
       issues.push(`CANDIDATE_INVALID:${index}`);
@@ -27,6 +29,10 @@ function prepare(input={}, independentIndexOwnerVerifier=null){
     }
     const sourceId=clean(row.source_id);
     const sourceRef=clean(row.source_ref);
+    if(sourceId && sourceIds.has(sourceId))issues.push('SOURCE_ID_DUPLICATE:'+index);
+    if(sourceRef && sourceRefs.has(sourceRef))issues.push('SOURCE_REF_DUPLICATE:'+index);
+    if(sourceId)sourceIds.add(sourceId);
+    if(sourceRef)sourceRefs.add(sourceRef);
     // Input source and provenance are proposals, never independent approval.
     // The caller cannot supply or select the owner verifier through input.
     let owner=null;
