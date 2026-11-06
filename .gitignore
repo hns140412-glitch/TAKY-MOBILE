@@ -8,3 +8,4 @@ dist/
 Thumbs.db
 
 # QA screenshots and JSON test evidence remain Git-visible.
+tools/.central-drive-consent-url.txt 

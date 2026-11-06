@@ -79,7 +79,8 @@ Default files loaded:
 - trusted-device auth flow: IMPLEMENTED / FUNCTION DEPLOYMENT EVIDENCED / LIVE BEHAVIOR UNVERIFIED
 - Canonical secure gateway code: IMPLEMENTED / FUNCTION DEPLOYMENT EVIDENCED / LIVE BEHAVIOR UNVERIFIED
 - Canonical remote runtime verification: NOT YET PASS
-- Google Drive adapter: NOT IMPLEMENTED
+- Google Drive adapter: IMPLEMENTED for central FAMILY data only (members.json registry, member/character profiles, character images) in `netlify/functions/_central_drive.mjs`; LIVE BEHAVIOR UNVERIFIED until the Drive consent bootstrap runs. Learning evidence/decisions stay in the Netlify Blobs strong store (Drive is not the live ledger).
+- Central family login API (moved from the PC pilot `C:\TAKY_CENTRAL_LOCAL` + tunnel): `netlify/functions/central.mjs` serves `/api/family/*` and `/api/learning/*` on this same origin using vendored TAKY `LEARNING/transport` (`netlify/central/VENDOR_MANIFEST.json` pins sha256 per file). Env: `TAKY_GOOGLE_WEB_CLIENT_ID`, `TAKY_CENTRAL_ALLOWED_ORIGINS`, `TAKY_DRIVE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN`, `TAKY_FAMILY_DRIVE_FOLDER_ID`, `TAKY_CENTRAL_TICKET_SECRET`; set `TAKY_CENTRAL_API_BASE_URL=self`. One-time setup: `tools/bootstrap-central-drive.mjs`.
 - canonical write adapter: NOT IMPLEMENTED
 - Netlify deployment: READY at the recorded baseline; see evidence below
 - release validation: UNVERIFIED

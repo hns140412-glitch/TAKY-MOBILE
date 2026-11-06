@@ -34,6 +34,14 @@ try{
   process.env.TAKY_CENTRAL_API_BASE_URL='http://central.example.test/';
   const r=await call();assert.equal(r.status,503);
  });
+ await test('"self" central base resolves to this same deploy origin',async()=>{
+  process.env.TAKY_GOOGLE_WEB_CLIENT_ID=client;
+  process.env.TAKY_CENTRAL_API_BASE_URL='self';
+  const res=await call();assert.equal(res.status,200);
+  assert.equal((await res.json()).apiBaseUrl,'https://taky-mobile.example.netlify.app');
+  const other=await call('https://attacker.example/.netlify/functions/family-auth-config');
+  assert.equal(other.status,503);
+ });
  await test('client secret or invalid Google client id cannot be used',async()=>{
   process.env.TAKY_CENTRAL_API_BASE_URL='https://central.example.test/';
   process.env.TAKY_GOOGLE_WEB_CLIENT_ID='secret-not-an-id';

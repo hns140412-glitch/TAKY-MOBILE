@@ -1,0 +1,104 @@
+{
+  "schema": "TAKY_LEARNING_DATA_RUNTIME_POLICY_V1",
+  "policy_version": "2026-09-25.1",
+  "source_matrix": {
+    "name": "LEARNING_DATA_COMPLETENESS_MATRIX_2026-09-23_V49.json",
+    "id": "1lTS_yIxjlJdnxes-Rh0RkUe0gSTliVP54sM_0abiUOY"
+  },
+  "index_authority": {
+    "source_index": "DATA_SOURCE_INDEX_2026-09-25_V6.json",
+    "utilization_index": "DATA_UTILIZATION_INDEX_2026-09-25_V26.json"
+  },
+  "owner": "LEARNING_ENGINE_CORE",
+  "fail_closed_on_unknown": true,
+  "records": [
+    {
+      "policy_id":"P-F01-READY","function_id":"LE-F01","consumer_app":"READY_SET","authorization_class":"READY_WITH_GUARDS",
+      "allowed_behaviors":["STANDARD_LOOKUP","STANDARD_ALIGNMENT","GRADE_BAND_FILTER","STANDARDS_LINKED_REPORTING"],
+      "forbidden_behaviors":["CAUSAL_PREREQUISITE_ENFORCEMENT","MASTERY_INFERENCE"],
+      "cannot_claim":["MASTERY_FROM_STANDARD_MEMBERSHIP","CAUSAL_SEQUENCE_FROM_CURRICULUM_ORDER"],
+      "required_provenance":["OFFICIAL_STANDARD_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F01-HIDE","function_id":"LE-F01","consumer_app":"HIDE_SEEK","authorization_class":"READY_WITH_GUARDS",
+      "allowed_behaviors":["STANDARD_LOOKUP","LANGUAGE_TARGET_ALIGNMENT"],
+      "forbidden_behaviors":["CAUSAL_PREREQUISITE_ENFORCEMENT"],
+      "cannot_claim":["MASTERY_FROM_STANDARD_MEMBERSHIP"],
+      "required_provenance":["OFFICIAL_STANDARD_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F01-SNAP","function_id":"LE-F01","consumer_app":"SNAP_POP","authorization_class":"READY_WITH_GUARDS",
+      "allowed_behaviors":["STANDARD_LOOKUP","GRADE_APPROPRIATENESS"],
+      "forbidden_behaviors":["CAUSAL_PREREQUISITE_ENFORCEMENT"],
+      "cannot_claim":["MASTERY_FROM_STANDARD_MEMBERSHIP"],
+      "required_provenance":["OFFICIAL_STANDARD_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F02-HIDE","function_id":"LE-F02","consumer_app":"HIDE_SEEK","authorization_class":"READY_WITH_GUARDS",
+      "allowed_behaviors":["TERMINOLOGY_NORMALIZATION","TOOL_LANGUAGE_LOOKUP"],
+      "forbidden_behaviors":["GLOBAL_AMBIGUOUS_SENSE_FORCE"],
+      "cannot_claim":["LEARNER_UNDERSTANDING_FROM_TERM_MATCH"],
+      "required_provenance":["TERM_SOURCE_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F03-HIDE","function_id":"LE-F03","consumer_app":"HIDE_SEEK","authorization_class":"CONDITIONAL",
+      "allowed_behaviors":["CONTEXTUAL_SENSE_SUPPORT"],
+      "forbidden_behaviors":["GLOBAL_SINGLE_SENSE_RESOLUTION"],
+      "cannot_claim":["GLOBAL_SINGLE_SENSE","LEARNER_DIAGNOSIS_FROM_DICTIONARY"],
+      "required_provenance":["NIKL_SOURCE_REF","EXPLICIT_CONTEXT_BINDING"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F04-READY","function_id":"LE-F04","consumer_app":"READY_SET","authorization_class":"CONDITIONAL",
+      "allowed_behaviors":["INFERENCE_CONSTRUCT_REFERENCE","CROSS_SOURCE_LITERACY_SUPPORT"],
+      "forbidden_behaviors":["ALMAENGI_CRITICAL_EVALUATION_PRODUCT_CLAIM"],
+      "cannot_claim":["ALMAENGI_PRODUCT_CRITICAL_EVALUATION_COVERAGE_FROM_KICE"],
+      "required_provenance":["SOURCE_SPECIFIC_REF","CONSTRUCT_SOURCE_LABEL"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F05-READY","function_id":"LE-F05","consumer_app":"READY_SET","authorization_class":"CONDITIONAL",
+      "allowed_behaviors":["QUALITATIVE_RISK_LABEL_DISPLAY","REMEDIATION_REFERENCE_CANDIDATE","CRITERION_LINKED_EVIDENCE_DISPLAY"],
+      "forbidden_behaviors":["NUMERIC_THRESHOLD_CLASSIFICATION","HARD_PASS_FAIL"],
+      "cannot_claim":["NUMERIC_CUT_SCORE","CAUSAL_PRESCRIPTION"],
+      "required_provenance":["FIRST_PARTY_QUALITATIVE_LABEL_REF"],"requires_human_review":true
+    },
+    {
+      "policy_id":"P-F06-SNAP","function_id":"LE-F06","consumer_app":"SNAP_POP","authorization_class":"CONDITIONAL",
+      "allowed_behaviors":["GENRE_RUBRIC_REFERENCE","WRITING_PROCESS_SCAFFOLD","NON_DIAGNOSTIC_SCAFFOLD_SELECTION"],
+      "forbidden_behaviors":["CAUSAL_WRITING_DIAGNOSIS"],
+      "cannot_claim":["VALIDATED_CAUSAL_ERROR_MODEL","GLOBAL_WRITING_ABILITY"],
+      "required_provenance":["WRITING_CORPUS_SOURCE_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-F07-READY","function_id":"LE-F07","consumer_app":"READY_SET","authorization_class":"READY_WITH_GUARDS",
+      "allowed_behaviors":["GOVERNED_DERIVED_ACTIVITY_REFERENCE"],
+      "forbidden_behaviors":["MASTERY_INFERENCE_FROM_ACTIVITY_AVAILABILITY","AUTO_SCHEDULE_FROM_ACTIVITY_REFERENCE","SOURCE_AUTHORITY_PROMOTION_TO_DERIVED_ACTIVITY"],
+      "cannot_claim":["LEARNER_MASTERY_FROM_ACTIVITY_AVAILABILITY","OFFICIAL_PUBLISHER_ENDORSEMENT_OF_DERIVED_ACTIVITY","CAUSAL_PRESCRIPTION_FROM_ACTIVITY_REFERENCE"],
+      "required_provenance":["GOVERNED_DERIVED_ACTIVITY_REF","OFFICIAL_SOURCE_DERIVATION_REF"],"requires_human_review":false
+    },
+    {
+      "policy_id":"P-H01-READY","function_id":"LE-H01","consumer_app":"READY_SET","authorization_class":"HOLD",
+      "allowed_behaviors":[],"forbidden_behaviors":["AUTOMATIC_PREREQUISITE_ENFORCEMENT","LEARNER_PATH_BLOCKING","CAUSAL_MASTERY_PROGRESSION"],
+      "cannot_claim":["CAUSAL_PREREQUISITE_NECESSITY"],"required_provenance":[],"requires_human_review":true
+    },
+    {
+      "policy_id":"P-H01-HIDE","function_id":"LE-H01","consumer_app":"HIDE_SEEK","authorization_class":"HOLD",
+      "allowed_behaviors":[],"forbidden_behaviors":["AUTOMATIC_PREREQUISITE_ENFORCEMENT","LEARNER_PATH_BLOCKING"],
+      "cannot_claim":["CAUSAL_PREREQUISITE_NECESSITY"],"required_provenance":[],"requires_human_review":true
+    },
+    {
+      "policy_id":"P-H01-SNAP","function_id":"LE-H01","consumer_app":"SNAP_POP","authorization_class":"HOLD",
+      "allowed_behaviors":[],"forbidden_behaviors":["AUTOMATIC_PREREQUISITE_ENFORCEMENT","LEARNER_PATH_BLOCKING"],
+      "cannot_claim":["CAUSAL_PREREQUISITE_NECESSITY"],"required_provenance":[],"requires_human_review":true
+    },
+    {
+      "policy_id":"P-H02-READY","function_id":"LE-H02","consumer_app":"READY_SET","authorization_class":"HOLD",
+      "allowed_behaviors":[],"forbidden_behaviors":["NUMERIC_THRESHOLD_CLASSIFICATION","HARD_PASS_FAIL","NUMERIC_INTERVENTION_TRIGGER"],
+      "cannot_claim":["CURRENT_NUMERIC_CUT_SCORE"],"required_provenance":[],"requires_human_review":true
+    },
+    {
+      "policy_id":"P-H03-READY","function_id":"LE-H03","consumer_app":"READY_SET","authorization_class":"HOLD",
+      "allowed_behaviors":[],"forbidden_behaviors":["ALMAENGI_CRITICAL_EVALUATION_PRODUCT_CLAIM","ALMAENGI_CRITICAL_EVALUATION_ROUTING"],
+      "cannot_claim":["CURRENT_ALMAENGI_EXPLICIT_CRITICAL_EVALUATION_STEM"],"required_provenance":[],"requires_human_review":true
+    }
+  ]
+}

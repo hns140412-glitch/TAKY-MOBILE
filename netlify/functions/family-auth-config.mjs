@@ -11,7 +11,9 @@ export default async function(request){
   const mobileOrigin=page.origin;
   const approvedOrigins=String(readEnv('TAKY_FAMILY_LOGIN_ALLOWED_ORIGINS')).split(',').map(s=>s.trim()).filter(Boolean);
   const clientId=String(readEnv('TAKY_GOOGLE_WEB_CLIENT_ID')).trim();
-  const base=String(readEnv('TAKY_CENTRAL_API_BASE_URL')).trim();
+  // "self" = the central API is hosted by this same deploy (netlify/functions/central.mjs).
+  const rawBase=String(readEnv('TAKY_CENTRAL_API_BASE_URL')).trim();
+  const base=rawBase==='self'?mobileOrigin+'/':rawBase;
   const originAllowed=approvedOrigins.includes(mobileOrigin);
   const url=new URL(base);
   const local=['localhost','127.0.0.1'].includes(url.hostname);

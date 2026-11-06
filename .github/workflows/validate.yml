@@ -35,3 +35,7 @@ jobs:
         run: node tools/test-badge-source-key-admin.mjs
       - name: Validate trusted-device badge source key registration endpoint
         run: node tools/test-badge-source-key-register-endpoint.mjs
+      - name: Validate central family functions (Drive family data, fake Google/Drive)
+        run: node tools/test-central-functions.mjs
+      - name: Validate family login bootstrap config
+        run: node --test tests/family-auth-config.test.mjs
