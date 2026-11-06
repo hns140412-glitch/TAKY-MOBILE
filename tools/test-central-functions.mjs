@@ -207,4 +207,30 @@ await t('Drive token failure -> 503/401 without leaking secrets', async () => {
   assert.ok(!text.includes('csecret') && !text.includes('refresh-revoked'));
 });
 
+// Cross-repo contract: Ready & Set's Character Master publisher against THESE real handlers.
+// Run with READY_CHARACTER_SYNC_MODULE=<path to Ready rs/rs-taky-character-sync.js>; skipped otherwise.
+if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready character master publish -> real central (asset + character profile)', async () => {
+  const { createRequire } = await import('node:module');
+  const Sync = createRequire(import.meta.url)(process.env.READY_CHARACTER_SYNC_MODULE);
+  const deps = { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live };
+  const fetchImpl = async (url, opt = {}) => {
+    const req = new Request(url, { method: opt.method, headers: { Origin: ORIGIN, ...(opt.headers || {}) }, body: opt.body });
+    return new URL(url).pathname === '/api/family/character-asset-bytes' ? handleAssetBytes(req, deps) : runNodeBridge(c.host.handler, req);
+  };
+  const runtime = { apiBaseUrl: ORIGIN + '/', getToken: async () => 'token-parent-aaaaaaaaaaaa', getFamilyId: async () => 'TAKY-HOME',
+    currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER'] }) };
+  const img = 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), crypto.randomBytes(3000)]).toString('base64');
+  const out = await Sync.publishMaster({ image: img, runtime, fetchImpl });
+  assert.equal(out.ok, true, JSON.stringify(out)); assert.equal(out.state, 'REGISTRY_BOUND');
+  const r = await call('/api/family/character-profile', { body: { family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'GET' } });
+  const j = await r.json(); assert.equal(j.found, true, JSON.stringify(j));
+  assert.equal(j.projection.character_id, 'ready-explorer'); assert.equal(j.projection.master_sha256, out.master_sha256);
+  const read = await call('/api/family/character-asset', { body: { family_id: 'TAKY-HOME', member_id: 'CHILD', character_id: 'ready-explorer', action: 'RESOLVE_READ', asset_ref: j.projection.master_asset_ref } });
+  const rj = await read.json(); assert.equal(read.status, 200, JSON.stringify(rj));
+  const bytes = Buffer.from(await (await handleAssetBytes(new Request(rj.read_url, { method: 'GET', headers: { Origin: ORIGIN } }), deps)).arrayBuffer());
+  assert.equal(sha(bytes), out.master_sha256, 'master read back byte-identical');
+  const again = await Sync.publishMaster({ image: img, runtime, fetchImpl });
+  assert.equal(again.identity_version, out.identity_version + 1, 'monotonic identity_version');
+});
+
 console.log(`central functions: ${passed} passed`);
