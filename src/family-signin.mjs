@@ -40,7 +40,14 @@ export function verifyServerFamilyResponse(body){
  if(new Set(result.map(x=>x.family_id)).size!==result.length)return [];
  return result;
 }
-export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}={}){
+// viaCentral (apps other than TAKY Mobile): sign in on the TAKY central page instead of in the app. One sign-in
+// there serves every app sharing that browser storage (Android Chrome + its home-screen apps, desktop): an app
+// opened for the first time makes one quick, silent stop at central and comes back signed in. Where storage is
+// separate (iOS home-screen apps) the Ready handoff pass covers it. (Taky 2026-11-14: "둘다 병행구조로 진행해")
+const CENTRAL_CHECK_KEY='taky.familySignin.centralCheckedAt';
+const CENTRAL_CHECK_MS=12*60*60*1000;
+export const CONNECT_PATH='/family-connect.html';
+export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk,viaCentral=false,navigate=u=>location.assign(u)}={}){
  let pending=false,epoch=0,holder=null,installed=null;
  const dom=()=>({panel:document.getElementById('familyLogin'),
   action:document.getElementById('familySignInBtn'),google:document.getElementById('familyGoogleTarget'),
@@ -73,13 +80,17 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
  const mount=()=>{
   const {action,signout}=dom();
   if(!action||!signout)return {ok:false,state:'FAMILY_LOGIN_VIEW_MISSING'};
-  action.addEventListener('click',()=>void begin());
+  action.addEventListener('click',()=>void (viaCentral?goCentral({silent:false}):begin()));
   signout.addEventListener('click',signOut);
   action.disabled=false;
   // Testable readiness means handlers are bound, NOT that anyone is signed in.
   document.documentElement.dataset.takyFamilySigninReady='true';
-  takeHandoff();
+  const handed=takeHandoff();
+  if(handed==='none')centralCheckedSet();
   if(!globalThis.TAKY_FAMILY_RUNTIME&&!installed){
+   if(viaCentral&&!deviceGet()&&handed!=='none'&&!centralCheckedRecently()&&!separateStorageApp()){
+    centralCheckedSet();void goCentral({silent:true});return {ok:true,state:'CENTRAL_CHECK'};
+   }
    // Signed in on this device before: continue silently with the device token (no Google prompt).
    if(deviceGet())void restore().then(r=>{if(!r.ok&&r.state==='DEVICE_SIGNIN_ENDED'&&markGet()&&!installed)resumeGoogle()});
    else if(markGet())resumeGoogle();
@@ -90,15 +101,50 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
  // origin's device token (restore() trades it for a long-lived one at once) and remove it from the address bar.
  function takeHandoff(){
   try{
+   // Fragment normally; the query when the link went through an Android intent (which owns the fragment).
    const h=new URLSearchParams(String(location.hash||'').replace(/^#/,''));
-   const t=clean(h.get('taky_handoff'));
-   if(!h.has('taky_handoff'))return false;
-   h.delete('taky_handoff');
-   const rest=h.toString();
-   globalThis.history?.replaceState?.(globalThis.history.state,'',location.pathname+location.search+(rest?'#'+rest:''));
+   const q=new URLSearchParams(String(location.search||'').replace(/^\?/,''));
+   const inHash=h.has('taky_handoff');
+   if(!inHash&&!q.has('taky_handoff'))return false;
+   const t=clean((inHash?h:q).get('taky_handoff'));
+   h.delete('taky_handoff');q.delete('taky_handoff');
+   const rest=h.toString(),qs=q.toString();
+   globalThis.history?.replaceState?.(globalThis.history.state,'',location.pathname+(qs?'?'+qs:'')+(rest?'#'+rest:''));
+   if(t==='none')return 'none';
    if(!DEVICE_TOKEN.test(t))return false;
    deviceSet(t);markSet();return true;
   }catch{return false}
+ }
+ const centralCheckedSet=()=>{try{globalThis.localStorage?.setItem(CENTRAL_CHECK_KEY,String(Date.now()))}catch{}};
+ const centralCheckedRecently=()=>{try{const t=Number(globalThis.localStorage?.getItem(CENTRAL_CHECK_KEY)||0);return t>0&&Date.now()-t<CENTRAL_CHECK_MS}catch{return false}};
+ // iOS home-screen app: its storage is its own, so central there never knows a sign-in; skip the silent stop.
+ const separateStorageApp=()=>{try{return globalThis.navigator?.standalone===true}catch{return false}};
+ // Go to the central sign-in page; it comes back to this exact page with #taky_handoff=<pass> or =none.
+ async function goCentral({silent}){
+  try{
+   const {central}=await loadConfig();
+   const back=new URL(location.href);back.hash='';
+   const u=new URL(CONNECT_PATH,central);u.searchParams.set('return',back.href);if(silent)u.searchParams.set('silent','1');
+   navigate(u.href);return {ok:true,state:'CENTRAL_REDIRECT'};
+  }catch{
+   if(!silent){resetView();say('중앙 로그인 페이지를 열지 못했어요. 잠시 뒤 다시 눌러 주세요.');}
+   return {ok:false,state:'CENTRAL_LOGIN_UNAVAILABLE'};
+  }
+ }
+ // Android: open the target as an intent so an installed TAKY home-screen app (WebAPK) can take the link instead
+ // of a browser tab inside the current app; anything else (or no installed app) falls back to the plain link.
+ // The pass rides in the query here because an intent link uses the fragment itself.
+ function androidIntentUrl(href){
+  const u=new URL(href);const h=new URLSearchParams(u.hash.replace(/^#/,''));const pass=h.get('taky_handoff');
+  if(pass){h.delete('taky_handoff');u.searchParams.set('taky_handoff',pass);u.hash=h.toString();}
+  if(u.hash)return null;
+  return 'intent://'+u.host+u.pathname+u.search+'#Intent;scheme=https;S.browser_fallback_url='+encodeURIComponent(u.href)+';end';
+ }
+ async function openApp(target,{android=/Android/i.test(globalThis.navigator?.userAgent||'')}={}){
+  const href=await handoffUrl(target);
+  const intent=android?(()=>{try{return androidIntentUrl(href)}catch{return null}})():null;
+  navigate(intent||href);
+  return {ok:true,via:intent?'ANDROID_INTENT':'LINK'};
  }
  // For the signed-in app that opens another TAKY app: the target URL with a 2-minute pass attached.
  // Not signed in, or the target is not an approved TAKY app -> the plain URL (the app then asks to sign in).
@@ -241,5 +287,5 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   globalThis.dispatchEvent(new Event('taky-central-auth-ready'));
   return {ok:true,state:'BOUND',family_id:family.family_id};
  }
- return {mount,begin,restore,signOut,selectFamily,handoffUrl,status:()=>({state:installed?'BOUND':holder?'FAMILY_SELECTION':'UNBOUND'})};
+ return {mount,begin,restore,signOut,selectFamily,handoffUrl,openApp,goCentral,status:()=>({state:installed?'BOUND':holder?'FAMILY_SELECTION':'UNBOUND'})};
 }

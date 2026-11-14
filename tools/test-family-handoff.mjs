@@ -112,4 +112,17 @@ await t('not signed in: handoffUrl returns the plain link', async () => {
   assert.equal(await r.handoffUrl(HIDE + '/a?b=1'), HIDE + '/a?b=1');
 });
 
+await t('Android: openApp uses an intent link (installed app can take it), pass in the query; app accepts it there', async () => {
+  open(READY + '/'); dom = nodes(); delete globalThis.TAKY_FAMILY_RUNTIME;
+  const went = []; const r = createFamilySignin({ fetchImpl, googleSdk, navigate: u => went.push(u) }); r.mount();
+  await r.begin(); googleCallback({ credential: GOOGLE }); await settle();
+  assert.equal((await r.openApp(HIDE + '/index.html?session_id=S1', { android: true })).via, 'ANDROID_INTENT');
+  const m = /^intent:\/\/hide\.example\/index\.html\?session_id=S1&taky_handoff=(tdv1\.[^#]+)#Intent;scheme=https;S\.browser_fallback_url=([^;]+);end$/.exec(went[0]);
+  assert.ok(m, went[0]); assert.equal(new URL(decodeURIComponent(m[2])).searchParams.get('taky_handoff'), decodeURIComponent(m[1]));
+  assert.equal((await r.openApp(HIDE + '/', { android: false })).via, 'LINK'); assert.match(went[1], /#taky_handoff=tdv1\./);
+  stores[HIDE].clear(); open(decodeURIComponent(m[2])); dom = nodes(); delete globalThis.TAKY_FAMILY_RUNTIME;
+  const hide = createFamilySignin({ fetchImpl, googleSdk }); hide.mount(); await settle();
+  assert.equal(hide.status().state, 'BOUND'); assert.equal(location.search, '?session_id=S1', 'pass removed from the query');
+});
+
 console.log(`family handoff: ${passed} passed`);
