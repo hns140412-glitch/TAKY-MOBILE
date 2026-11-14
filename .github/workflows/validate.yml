@@ -41,5 +41,6 @@ jobs:
         run: |
           node tools/test-family-signin-device.mjs
           node tools/test-family-handoff.mjs
+          node tools/test-function-routes.mjs
       - name: Validate family login bootstrap config
         run: node --test tests/family-auth-config.test.mjs
