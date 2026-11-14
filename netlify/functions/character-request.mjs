@@ -3,17 +3,13 @@ import googleAuthLibrary from 'google-auth-library';
 import { readCentralConfig, notConfigured } from './_central_host.mjs';
 import { createDriveClient, createDriveMembershipProvider } from './_central_drive.mjs';
 import { createCharacterRequestStore, createCharacterRequestHandler } from './_character_request.mjs';
+import { createDeviceTokens, deviceAwareOAuthClient, subjectVerifier } from './_family_device.mjs';
 
 export function characterRequestFor(origin, { config = readCentralConfig(), fetchImpl, oauth2Client } = {}) {
   if (config.missing.length) return { ok: false, missing: config.missing };
   const drive = createDriveClient({ ...config.drive, ...(fetchImpl ? { fetchImpl } : {}) });
-  const client = oauth2Client || new googleAuthLibrary.OAuth2Client();
-  const verifyIdToken = async idToken => {
-    const t = await client.verifyIdToken({ idToken, audience: config.clientIds });
-    const p = t.getPayload();
-    if (!p?.sub || !['accounts.google.com', 'https://accounts.google.com'].includes(p.iss)) throw Error('BAD_TOKEN');
-    return p.sub;
-  };
+  const client = deviceAwareOAuthClient(oauth2Client || new googleAuthLibrary.OAuth2Client(), createDeviceTokens(config.ticketSecret));
+  const verifyIdToken = subjectVerifier(client, config.clientIds);
   const store = createCharacterRequestStore({ drive, folderId: config.folderId, secret: config.ticketSecret, publicOrigin: origin });
   return { ok: true, store, handle: createCharacterRequestHandler({ verifyIdToken, lookupMemberships: createDriveMembershipProvider({ drive, folderId: config.folderId }), store, allowedOrigins: config.allowedOrigins }) };
 }

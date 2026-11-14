@@ -1,7 +1,13 @@
 // Existing TAKY contract: Google credential -> central /api/family/session -> TAKY_FAMILY_RUNTIME.
-// Family membership comes ONLY from the verified server response. No localStorage tokens.
+// Family membership comes ONLY from the verified server response.
+// One sign-in per device (Taky 2026-11-14, "로그인은 한번하면 다시 안하고 싶은데"): after the first Google
+// sign-in the central server issues a DEVICE token (no family scope, no identity fields; membership is
+// re-checked on every call). It is kept in this origin's localStorage, renewed on every visit and
+// deleted on sign-out. A home-screen app and the browser keep separate storage, so each signs in once.
 const clean=v=>typeof v==='string'?v.trim():'';
 const jsonConfig='/.netlify/functions/family-auth-config';
+const DEVICE_KEY='taky.familyDevice.v1';
+const DEVICE_TOKEN=/^tdv1\.[A-Za-z0-9_-]{20,900}\.[A-Za-z0-9_-]{43}$/;
 let sdkLoading=null;
 async function browserGoogleSdk(){
  if(globalThis.google?.accounts?.id)return globalThis.google.accounts.id;
@@ -41,16 +47,19 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   options:document.getElementById('familyChooseTarget'),status:document.getElementById('familyLoginStatus'),
   signout:document.getElementById('familySignOutBtn')});
  const MARK='taky.familySignin.resume';
- // Non-secret "was signed in on this device" flag only. It never holds a token or identity;
- // it lets the next visit ask Google for a FRESH credential automatically (One Tap auto-select).
+ // Non-secret "was signed in on this device" flag: if the device token is gone or revoked, the next
+ // visit asks Google for a FRESH credential automatically (One Tap auto-select).
  const markGet=()=>{try{return globalThis.localStorage?.getItem(MARK)==='1'}catch{return false}};
  const markSet=()=>{try{globalThis.localStorage?.setItem(MARK,'1')}catch{}};
  const markClear=()=>{try{globalThis.localStorage?.removeItem(MARK);globalThis.sessionStorage?.removeItem(MARK)}catch{}};
+ const deviceGet=()=>{try{const v=clean(globalThis.localStorage?.getItem(DEVICE_KEY));return DEVICE_TOKEN.test(v)?v:''}catch{return ''}};
+ const deviceSet=v=>{try{globalThis.localStorage?.setItem(DEVICE_KEY,v)}catch{}};
+ const deviceClear=()=>{try{globalThis.localStorage?.removeItem(DEVICE_KEY)}catch{}};
  const say=value=>{const {status}=dom();if(status)status.textContent=value;};
  const resetView=()=>{const x=dom();x.google?.replaceChildren();x.options?.replaceChildren();if(x.signout)x.signout.hidden=true;
   if(x.action)x.action.hidden=false};
  function signOut(){
-  epoch++;pending=false;markClear();
+  epoch++;pending=false;markClear();deviceClear();
   if(installed&&globalThis.TAKY_FAMILY_RUNTIME===installed)delete globalThis.TAKY_FAMILY_RUNTIME;
   holder=null;installed=null;
   resetView();say('로그인하지 않음 · 가족 개인정보 숨김');
@@ -58,6 +67,9 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   document.documentElement.dataset.takyCentralAuth='UNBOUND';
   globalThis.dispatchEvent(new Event('taky-central-auth-cleared'));
  }
+ const resumeGoogle=()=>void begin({resume:true}).then(r=>{
+  if(r.state==='GOOGLE_BUTTON_READY'&&!installed)say('가족 로그인을 다시 연결하는 중이에요. 자동으로 안 되면 Google 로그인 버튼을 눌러 주세요.');
+ });
  const mount=()=>{
   const {action,signout}=dom();
   if(!action||!signout)return {ok:false,state:'FAMILY_LOGIN_VIEW_MISSING'};
@@ -66,22 +78,57 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   action.disabled=false;
   // Testable readiness means handlers are bound, NOT that anyone is signed in.
   document.documentElement.dataset.takyFamilySigninReady='true';
-  // Non-secret marker only: ask for Google sign-in again once; never reuse identity.
-  if(markGet()&&!globalThis.TAKY_FAMILY_RUNTIME&&!installed)void begin({resume:true}).then(r=>{
-   if(r.state==='GOOGLE_BUTTON_READY'&&!installed)say('가족 로그인을 다시 연결하는 중이에요. 자동으로 안 되면 Google 로그인 버튼을 눌러 주세요.');
-  });
+  if(!globalThis.TAKY_FAMILY_RUNTIME&&!installed){
+   // Signed in on this device before: continue silently with the device token (no Google prompt).
+   if(deviceGet())void restore().then(r=>{if(!r.ok&&r.state==='DEVICE_SIGNIN_ENDED'&&markGet()&&!installed)resumeGoogle()});
+   else if(markGet())resumeGoogle();
+  }
   return {ok:true};
  };
+ async function loadConfig(){
+  const res=await fetchImpl(jsonConfig,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
+  const config=await res.json();
+  if(!res.ok||!config?.ok||config?.loginOrigin!==location.origin||!validClientId(config?.googleClientId))
+   throw Error('CENTRAL_LOGIN_CONFIGURATION_REQUIRED');
+  return {config,central:safeBase(config.apiBaseUrl)};
+ }
+ // Google credential (first sign-in) or device token (renewal) -> fresh device token.
+ // {revoked:true} = the server refused it; {} = unreachable or an older server without the endpoint.
+ async function deviceExchange(central,bearer){
+  try{
+   const r=await fetchImpl(new URL('/api/family/device',central).href,{method:'POST',cache:'no-store',redirect:'error',
+    headers:{'content-type':'application/json','authorization':'Bearer '+bearer},body:'{}'});
+   if(r.status===401||r.status===403)return {revoked:true};
+   const b=await r.json();const t=clean(b?.device_token);
+   return r.ok&&b?.ok&&DEVICE_TOKEN.test(t)?{token:t}:{};
+  }catch{return {}}
+ }
+ async function restore(){
+  const saved=deviceGet();
+  if(!saved)return {ok:false,state:'NO_DEVICE_SIGNIN'};
+  if(pending)return {ok:false,state:'SIGNIN_ALREADY_IN_PROGRESS'};
+  if(installed)return {ok:true,state:'ALREADY_SIGNED_IN'};
+  const ticket=++epoch;pending=true;resetView();say('이 기기의 가족 로그인을 이어가는 중…');
+  try{
+   const {central}=await loadConfig();
+   if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
+   const x=await deviceExchange(central,saved);
+   if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
+   if(x.revoked){deviceClear();resetView();say('이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.');return {ok:false,state:'DEVICE_SIGNIN_ENDED'}}
+   const token=x.token||saved;if(x.token)deviceSet(x.token);
+   const r=await acceptCredential(token,central,ticket,{device:true});
+   return r;
+  }catch{
+   if(ticket===epoch){resetView();say('중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열거나 Google 로그인 버튼을 눌러 주세요.');}
+   return {ok:false,state:'CENTRAL_LOGIN_UNAVAILABLE'};
+  }finally{if(ticket===epoch)pending=false}
+ }
  async function begin({resume=false}={}){
   if(pending)return {ok:false,state:'SIGNIN_ALREADY_IN_PROGRESS'};
   if(installed)return {ok:true,state:'ALREADY_SIGNED_IN'};
   const ticket=++epoch;pending=true;resetView();say('가족 로그인 설정 확인 중…');
   try{
-   const res=await fetchImpl(jsonConfig,{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error'});
-   const config=await res.json();
-   if(!res.ok||!config?.ok||config?.loginOrigin!==location.origin||!validClientId(config?.googleClientId))
-    throw Error('CENTRAL_LOGIN_CONFIGURATION_REQUIRED');
-   const central=safeBase(config.apiBaseUrl);
+   const {config,central}=await loadConfig();
    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
    const sdk=await googleSdk();
    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
@@ -100,38 +147,47 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
    return {ok:false,state:'CENTRAL_LOGIN_UNAVAILABLE'};
   }finally{if(ticket===epoch)pending=false}
  }
- async function acceptCredential(raw,central,ticket){
-  if(ticket!==epoch)return;
-  const credential=clean(raw);
+ async function acceptCredential(raw,central,ticket,{device=false}={}){
+  if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
+  let credential=clean(raw);
   // Format check is NOT token verification; server verifies signature, audience, membership.
-  if(credential.length<100||credential.length>8192||credential.split('.').length!==3){
-   say('Google 로그인 응답이 유효하지 않습니다.');return;
+  if(device?!DEVICE_TOKEN.test(credential):(credential.length<100||credential.length>8192||credential.split('.').length!==3)){
+   say('Google 로그인 응답이 유효하지 않습니다.');return {ok:false,state:'CREDENTIAL_INVALID'};
   }
-  say('중앙 가족 소속 확인 중…');
+  say(device?'이 기기의 가족 로그인을 이어가는 중…':'중앙 가족 소속 확인 중…');
+  let ended=!device;
   try{
    const response=await fetchImpl(new URL('/api/family/session',central).href,{
     method:'POST',cache:'no-store',redirect:'error',
     headers:{'content-type':'application/json','authorization':'Bearer '+credential},body:'{}'
    });
+   if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
+   if(!response.ok){if(response.status===401||response.status===403){ended=true;if(device)deviceClear()}throw Error('CENTRAL_SESSION_REJECTED')}
    const body=await response.json();
-   if(ticket!==epoch)return;
-   if(!response.ok)throw Error('CENTRAL_SESSION_REJECTED');
+   if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
    const families=verifyServerFamilyResponse(body);
-   if(!families.length)throw Error('AUTHORIZED_FAMILY_NOT_FOUND');
-   holder={credential,central,families,ticket};
-   if(families.length===1)await selectFamily(families[0].family_id,ticket);
-   else{
-    const x=dom();x.options?.replaceChildren();
-    for(let i=0;i<families.length;i++){
-      const b=document.createElement('button');b.type='button';b.className='family-member-choice';
-      b.textContent=`승인된 가족 ${i+1}`;
-      b.addEventListener('click',()=>void selectFamily(families[i].family_id,ticket));
-      x.options?.appendChild(b);
-    }
-    say('중앙 서버에서 승인된 가족을 선택하세요.');
+   if(!families.length){ended=true;if(device)deviceClear();throw Error('AUTHORIZED_FAMILY_NOT_FOUND')}
+   if(!device){
+    // Keep this device signed in: swap the 1-hour Google credential for a renewable device token.
+    const x=await deviceExchange(central,credential);
+    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
+    if(x.token){deviceSet(x.token);credential=x.token}
    }
+   holder={credential,central,families,ticket};
+   if(families.length===1)return await selectFamily(families[0].family_id,ticket);
+   const x=dom();x.options?.replaceChildren();
+   for(let i=0;i<families.length;i++){
+     const b=document.createElement('button');b.type='button';b.className='family-member-choice';
+     b.textContent=`승인된 가족 ${i+1}`;
+     b.addEventListener('click',()=>void selectFamily(families[i].family_id,ticket));
+     x.options?.appendChild(b);
+   }
+   say('중앙 서버에서 승인된 가족을 선택하세요.');
+   return {ok:true,state:'FAMILY_SELECTION'};
   }catch{
-   if(ticket===epoch){holder=null;say('가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.');}
+   if(ticket===epoch){holder=null;resetView();
+    say(!device?'가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.':ended?'이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.':'중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요.');}
+   return {ok:false,state:!device?'CENTRAL_SESSION_REJECTED':ended?'DEVICE_SIGNIN_ENDED':'CENTRAL_LOGIN_UNAVAILABLE'};
   }
  }
  async function selectFamily(id,ticket=epoch){
@@ -154,5 +210,5 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk}=
   globalThis.dispatchEvent(new Event('taky-central-auth-ready'));
   return {ok:true,state:'BOUND',family_id:family.family_id};
  }
- return {mount,begin,signOut,selectFamily,status:()=>({state:installed?'BOUND':holder?'FAMILY_SELECTION':'UNBOUND'})};
+ return {mount,begin,restore,signOut,selectFamily,status:()=>({state:installed?'BOUND':holder?'FAMILY_SELECTION':'UNBOUND'})};
 }

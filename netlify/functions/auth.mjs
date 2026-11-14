@@ -1,6 +1,6 @@
-import { createSession, env, safeEqual, sessionCookie } from './_auth.mjs';
+import { createSession, env, safeEqual, sessionCookie, SESSION_MAX_AGE } from './_auth.mjs';
 
-const MAX_AGE = 30 * 24 * 60 * 60;
+const MAX_AGE = SESSION_MAX_AGE;
 
 export default async request => {
   if (request.method !== 'POST') {

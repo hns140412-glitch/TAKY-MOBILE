@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 const COOKIE='taky_admin_session';
-const MAX_AGE=12*60*60;
+// One admin sign-in per device (Taky 2026-11-14): ~400 days (Chrome's cookie ceiling), renewed on every
+// admin-session check, so only sign-out or 400 days without use ends it.
+export const MAX_AGE=400*24*60*60;
 const env=n=>globalThis.Netlify?.env?.get?.(n)??process.env[n];
 const mac=(s,k)=>crypto.createHmac('sha256',k).update(s).digest('base64url');
 const same=(a,b)=>crypto.timingSafeEqual(crypto.createHash('sha256').update(String(a)).digest(),crypto.createHash('sha256').update(String(b)).digest());

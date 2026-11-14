@@ -1,6 +1,8 @@
 import {configured,validKey,adminCookie,logoutCookie,authorized,sameOrigin,respond} from './_admin-session.mjs';
 export default async request=>{
- if(request.method==='GET')return respond({ok:true,authorized:configured()&&authorized(request)});
+ if(request.method==='GET'){const ok=configured()&&authorized(request);
+  // Rolling: a still-valid session is re-issued, so a device that keeps using admin never signs in again.
+  return respond({ok:true,authorized:ok},200,ok?{'Set-Cookie':adminCookie()}:{});}
  if(!['POST','DELETE'].includes(request.method))return respond({ok:false,error:'METHOD_NOT_ALLOWED'},405,{Allow:'GET, POST, DELETE'});
  if(!sameOrigin(request))return respond({ok:false,error:'ORIGIN_DENIED'},403);
  if(request.method==='DELETE')return respond({ok:true,authorized:false},200,{'Set-Cookie':logoutCookie()});

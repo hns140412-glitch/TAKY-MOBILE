@@ -1,4 +1,4 @@
-import { env, isAuthorized } from './_auth.mjs';
+import { env, isAuthorized, renewedSessionCookie } from './_auth.mjs';
 
 const DEFAULT_REPO = 'hns140412-glitch/TAKY';
 const DEFAULT_REF = 'main';
@@ -66,7 +66,8 @@ export default async request => {
       files,
     }), {
       status:200,
-      headers:{ 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'private, max-age=60' },
+      // Rolling access-key session: every successful load renews it, so the key is asked once per device.
+      headers:{ 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'private, max-age=60', 'Set-Cookie':renewedSessionCookie(sessionSecret) },
     });
   } catch (error) {
     return new Response(JSON.stringify({ ok:false, error:String(error) }), {

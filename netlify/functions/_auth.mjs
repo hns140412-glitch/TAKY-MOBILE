@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 
 const COOKIE_NAME = 'taky_session';
+// One access-key sign-in per device (Taky 2026-11-14): ~400 days (Chrome's cookie ceiling), renewed on use.
+export const SESSION_MAX_AGE = 400 * 24 * 60 * 60;
+export const renewedSessionCookie = secret => sessionCookie(createSession(secret, SESSION_MAX_AGE), SESSION_MAX_AGE);
 
 function sign(value, secret) {
   return crypto.createHmac('sha256', secret).update(value).digest('base64url');
