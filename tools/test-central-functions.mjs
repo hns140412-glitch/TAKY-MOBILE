@@ -146,7 +146,7 @@ await t('character photo: ticket upload -> Drive -> commit -> signed read', asyn
   const deps = { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live };
   const bad = await handleAssetBytes(new Request(j.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: Buffer.concat([png, Buffer.from([1])]) }), deps);
   assert.equal(bad.status, 409, 'size/sha mismatch rejected');
-  const forged = await handleAssetBytes(new Request(j.upload_url.replace(/.$/, c => c === 'A' ? 'B' : 'A'), { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: png }), deps);
+  const forged = await handleAssetBytes(new Request(j.upload_url.slice(0, -5) + (j.upload_url.at(-5) === 'A' ? 'B' : 'A') + j.upload_url.slice(-4), { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: png }), deps);
   assert.equal(forged.status, 401);
   const put = await handleAssetBytes(new Request(j.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png', Origin: SAVEY }, body: png }), deps);
   assert.equal(put.status, 200, await put.clone().text());

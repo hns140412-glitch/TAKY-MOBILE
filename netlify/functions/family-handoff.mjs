@@ -2,7 +2,7 @@
 import googleAuthLibrary from 'google-auth-library';
 import { readCentralConfig, notConfigured } from './_central_host.mjs';
 import { createDriveClient, createDriveMembershipProvider } from './_central_drive.mjs';
-import { createDeviceTokens, deviceAwareOAuthClient, subjectVerifier, createFamilyHandoffHandler, HANDOFF_PATH, HANDOFF_TTL_SECONDS } from './_family_device.mjs';
+import { createDeviceTokens, deviceAwareOAuthClient, subjectVerifier, createFamilyHandoffHandler, HANDOFF_TTL_SECONDS } from './_family_device.mjs';
 
 export function familyHandoffFor({ config = readCentralConfig(), fetchImpl, oauth2Client, now } = {}) {
   if (config.missing.length) return { ok: false, missing: config.missing };
@@ -19,4 +19,5 @@ export default async request => {
   const c = familyHandoffFor();
   return c.ok ? c.handle(request) : notConfigured(c.missing);
 };
-export const config = { path: HANDOFF_PATH };
+// Netlify reads this statically at build time: it must be a string literal, not an imported constant.
+export const config = { path: '/api/family/handoff' };
