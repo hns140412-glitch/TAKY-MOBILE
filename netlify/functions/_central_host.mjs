@@ -5,6 +5,7 @@ import googleAuthLibrary from 'google-auth-library';
 import { getStore } from '@netlify/blobs';
 import Host from '../central/LEARNING/transport/central-learning-production-host.js';
 import { createDriveClient, createDriveJsonStore, createRoutingStore, createDriveMembershipProvider, createDriveCharacterObjectStore } from './_central_drive.mjs';
+import { createDeviceTokens, deviceAwareOAuthClient } from './_family_device.mjs';
 
 export const LIVE_STORE_NAME = 'taky-central-live-v1';
 const readEnv = name => String(globalThis.Netlify?.env?.get?.(name) ?? process.env[name] ?? '').trim();
@@ -41,7 +42,8 @@ export function centralFor(origin, { config = readCentralConfig(), fetchImpl, oa
   const objectStore = createDriveCharacterObjectStore({ drive, folderId: config.folderId, secret: config.ticketSecret, publicOrigin: origin });
   const host = Host.create({
     clientIds: config.clientIds,
-    googleAuthLibrary, oauth2Client,
+    // Device tokens (one sign-in per device) are accepted here; Google ID tokens pass through unchanged.
+    googleAuthLibrary, oauth2Client: deviceAwareOAuthClient(oauth2Client || new googleAuthLibrary.OAuth2Client(), createDeviceTokens(config.ticketSecret)),
     lookupMemberships: createDriveMembershipProvider({ drive, folderId: config.folderId }),
     store: createRoutingStore({ driveStore: createDriveJsonStore({ drive, folderId: config.folderId }), liveStore: live }),
     characterAssetObjectStore: objectStore,

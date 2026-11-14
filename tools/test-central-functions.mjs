@@ -246,6 +246,37 @@ await t('character request: a non-parent member cannot list or approve', async (
   assert.equal((await req({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' })).status, 200);
 });
 
+await t('device sign-in: Google once -> device token works on the real vendored host and character request; revoked by members.json', async () => {
+  const { familyDeviceFor } = await import('../netlify/functions/family-device.mjs');
+  const { characterRequestFor } = await import('../netlify/functions/character-request.mjs');
+  const dv = familyDeviceFor({ config, fetchImpl: drive.fetchImpl, oauth2Client });
+  const ask = (token, origin = SAVEY) => dv.handle(new Request(ORIGIN + '/api/family/device', { method: 'POST', headers: { Origin: origin, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}' }));
+  assert.equal((await ask('token-stranger-aaaaaaaaaa')).status, 401, 'Google account outside the family gets no device token');
+  assert.equal((await ask('token-parent-aaaaaaaaaaaa', 'https://evil.example')).status, 403);
+  let r = await ask('token-parent-aaaaaaaaaaaa'); let j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(r.headers.get('access-control-allow-origin'), SAVEY);
+  const dt = j.device_token; assert.match(dt, /^tdv1\./); assert.ok(Date.parse(j.expires_at) > Date.now() + 399 * 86400e3);
+  r = await call('/api/family/session', { token: dt, body: {} }); j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(j.session.principal_id, 'google:111');
+  const renewed = (await (await ask(dt)).json()).device_token; assert.match(renewed, /^tdv1\./);
+  const rq = characterRequestFor(ORIGIN, { config, fetchImpl: drive.fetchImpl, oauth2Client });
+  r = await rq.handle(new Request(ORIGIN + '/api/family/character-request', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + renewed, 'Content-Type': 'application/json' }, body: JSON.stringify({ family_id: 'TAKY-HOME', member_id: 'CHILD', action: 'STATUS' }) }));
+  assert.equal(r.status, 200, await r.clone().text());
+  const forged = dt.slice(0, -4) + 'AAAA';
+  assert.equal((await call('/api/family/session', { token: forged, body: {} })).status, 401);
+  const other = readCentralConfig(env({ ...baseEnv, TAKY_CENTRAL_TICKET_SECRET: 'y'.repeat(40) }));
+  const c2 = centralFor(ORIGIN, { config: other, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live });
+  assert.equal((await runNodeBridge(c2.host.handler, new Request(ORIGIN + '/api/family/session', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + dt, 'Content-Type': 'application/json' }, body: '{}' }))).status, 401, 'other secret');
+  const members = [...drive.files.values()].find(f => f.name === 'members.json'); const keep = members.bytes;
+  members.bytes = Buffer.from(JSON.stringify([]));
+  // members.json is cached 30 s per instance; a fresh instance sees the removal.
+  const c3 = centralFor(ORIGIN, { config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live });
+  assert.equal((await runNodeBridge(c3.host.handler, new Request(ORIGIN + '/api/family/session', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + renewed, 'Content-Type': 'application/json' }, body: '{}' }))).status, 401, 'removed from members.json -> device signed out');
+  const dv2 = familyDeviceFor({ config, fetchImpl: drive.fetchImpl, oauth2Client });
+  assert.equal((await dv2.handle(new Request(ORIGIN + '/api/family/device', { method: 'POST', headers: { Origin: SAVEY, Authorization: 'Bearer ' + renewed }, body: '{}' }))).status, 401, 'and cannot renew');
+  members.bytes = keep;
+});
+
 // Cross-repo contract: Ready & Set's no-cost character request against THESE real handlers + TAKY Mobile's parent approval.
 // Run with READY_CHARACTER_SYNC_MODULE=<path to Ready rs/rs-taky-character-sync.js>; skipped otherwise.
 if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> parent approves in TAKY Mobile -> Ready reads the master back', async () => {
