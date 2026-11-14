@@ -88,3 +88,39 @@ export function createFamilyDeviceHandler({ verifySubject, lookupMemberships, to
     return json(200, { ok: true, device_token: out.token, expires_at: out.expires_at }, cors);
   };
 }
+
+// ---- Ready -> app handoff (Taky 2026-11-14: "래디앤셋 로그인 하면 나머지는 일괄 차용").
+// Every app lives on its own origin (and on iOS every home-screen app has its own storage), so a sign-in
+// cannot be shared through the browser. Instead a signed-in app (Ready) asks for a 2-minute device-format
+// token and opens the other app with it in the URL fragment (#taky_handoff=…). The fragment never reaches a
+// server; the receiving app immediately trades it at /api/family/device for its own long-lived device token.
+// Same key and checks as a device token, so membership is still re-checked on every call.
+export const HANDOFF_PATH = '/api/family/handoff';
+export const HANDOFF_TTL_SECONDS = 120;
+export function createFamilyHandoffHandler({ verifySubject, lookupMemberships, handoffTokens, allowedOrigins }) {
+  const json = (status, body, cors) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'private, no-store, max-age=0', 'X-Content-Type-Options': 'nosniff', ...cors } });
+  return async function handle(request) {
+    const origin = request.headers.get('origin');
+    if (origin && !allowedOrigins.includes(origin)) return json(403, { ok: false, reason: 'ORIGIN_NOT_ALLOWED' }, {});
+    const cors = origin ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Vary': 'Origin' } : {};
+    if (request.method === 'OPTIONS') return origin ? new Response(null, { status: 204, headers: cors }) : json(404, { ok: false }, {});
+    if (request.method !== 'POST') return json(405, { ok: false, reason: 'POST_REQUIRED' }, cors);
+    let target;
+    try { target = new URL(String((await request.json())?.target || '')); } catch { target = null; }
+    // The pass is only ever handed to another approved TAKY app.
+    if (!target || target.protocol !== 'https:' || !allowedOrigins.includes(target.origin))
+      return json(403, { ok: false, reason: 'TARGET_ORIGIN_NOT_ALLOWED' }, cors);
+    const m = String(request.headers.get('authorization') || '').trim().match(BEARER);
+    if (!m) return json(401, { ok: false, reason: 'VERIFIED_BEARER_REQUIRED' }, cors);
+    let sub, rows;
+    try {
+      sub = await verifySubject(m[1]);
+      rows = await lookupMemberships({ provider: 'GOOGLE_OIDC', subject: sub });
+    } catch { return json(401, { ok: false, reason: 'BEARER_IDENTITY_VERIFICATION_FAILED' }, cors); }
+    if (!Array.isArray(rows) || !rows.some(r => r?.status === 'ACTIVE')) return json(401, { ok: false, reason: 'VERIFIED_FAMILY_MEMBERSHIP_REQUIRED' }, cors);
+    const out = handoffTokens.issue(sub);
+    return json(200, { ok: true, handoff_token: out.token, expires_at: out.expires_at, target_origin: target.origin }, cors);
+  };
+}

@@ -37,5 +37,9 @@ jobs:
         run: node tools/test-badge-source-key-register-endpoint.mjs
       - name: Validate central family functions (Drive family data, fake Google/Drive)
         run: node tools/test-central-functions.mjs
+      - name: Validate one sign-in per device and Ready -> app handoff
+        run: |
+          node tools/test-family-signin-device.mjs
+          node tools/test-family-handoff.mjs
       - name: Validate family login bootstrap config
         run: node --test tests/family-auth-config.test.mjs
