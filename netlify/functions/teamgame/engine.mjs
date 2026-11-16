@@ -1,7 +1,10 @@
 // TAKY 팀게임 engine — stateless request handlers over a small key/value store.
 // Runs inside a Netlify Function (Blobs) or the local dev server (memory/file store).
-// No sockets and no timers: phases advance lazily from the clock on every request,
-// and every room write is compare-and-swap, so concurrent phones never double-score.
+// No sockets and no timers: phases advance from the clock when the host screen polls.
+// One key, one writer (Netlify Blobs does not enforce conditional writes, measured 2026-11-16):
+//   room/CODE        written only by the controlling host screen (its requests are serialized client-side)
+//   join/CODE/TEAM   written once by the joining phone; the host merges it into the room and deletes it
+//   metric/CODE/SEED/TEAM, seen/CODE/TEAM   written only by that team's phone (serialized client-side)
 import crypto from 'node:crypto';
 import R from './rounds.cjs';
 
@@ -17,12 +20,13 @@ const CODE_RE = /^\d{4}$/;
 
 /*
  kv interface (all async):
-   get(key)                 -> { data, etag } | null
-   cas(key, data, etag)     -> true when written (etag null = only if new)
-   put(key, data)           -> unconditional write
+   get(key) -> { data } | null     put(key, data)     del(key)     list(prefix) -> [key]
 */
+const JOIN_WAIT_MS = 6000;   // a joining phone waits this long for the host screen to admit it
+const JOIN_STALE_MS = 6500;  // the host ignores join requests older than this (that phone already gave up)
 const K = {
   room: (c) => `room/${c}`,
+  join: (c, t) => `join/${c}/${t}`,
   metric: (c, seed, t) => `metric/${c}/${seed}/${t}`,
   seen: (c, t) => `seen/${c}/${t}`,
 };
@@ -53,21 +57,49 @@ async function advance(kv, room, now) {
   return changed;
 }
 
-/** Load a room, apply clock transitions, then optionally mutate it; retries on write races. */
-async function withRoom(kv, code, now, mutate) {
-  if (!CODE_RE.test(String(code || ''))) return { room: null };
-  for (let i = 0; i < 14; i++) {
-    if (i) await new Promise((r) => setTimeout(r, 5 + Math.random() * 25 * Math.min(i, 6))); // jittered backoff on write races
-    const rec = await kv.get(K.room(code));
-    if (!rec || now - rec.data.createdAt > ROOM_TTL) return { room: null };
-    const room = rec.data;
-    let changed = await advance(kv, room, now);
-    let result;
-    if (mutate) { result = await mutate(room); if (result && result.changed) changed = true; }
-    if (!changed) return { room, result };
-    if (await kv.cas(K.room(code), room, rec.etag)) return { room, result };
+// Admit (or refuse) phones that asked to join since the last host poll.
+async function mergeJoins(kv, room, now) {
+  const keys = await kv.list(`join/${room.code}/`);
+  if (!keys.length) return false;
+  let changed = false;
+  for (const key of keys.sort()) {
+    const rec = await kv.get(key); await kv.del(key);
+    const j = rec && rec.data; if (!j || now - j.at > JOIN_STALE_MS || room.teams.some((t) => t.id === j.id)) continue;
+    room.rejected = room.rejected || {};
+    if (room.teams.length >= MAX_TEAMS) room.rejected[j.id] = 'FULL';
+    else if (room.teams.some((t) => t.name === j.name)) room.rejected[j.id] = 'DUP';
+    else {
+      const used = new Set(room.teams.map((t) => t.crew));
+      const free = Array.from({ length: 24 }, (_, i) => i + 1).filter((n) => !used.has(n));
+      room.teams.push({ id: j.id, token: j.token, name: j.name, crew: free[crypto.randomInt(0, free.length)] || 1, color: TEAM_COLORS[room.teams.length % TEAM_COLORS.length], score: 0, best: {}, joinedAt: j.at });
+    }
+    const ids = Object.keys(room.rejected); if (ids.length > 40) delete room.rejected[ids[0]];
+    changed = true;
   }
-  throw new Error('ROOM_BUSY');
+  return changed;
+}
+
+async function loadRoom(kv, code, now) {
+  if (!CODE_RE.test(String(code || ''))) return null;
+  const rec = await kv.get(K.room(code));
+  return rec && now - rec.data.createdAt <= ROOM_TTL ? rec.data : null;
+}
+
+/** Host-screen write path: the only writer of room/CODE. */
+async function hostRoom(kv, code, hostKey, now, mutate) {
+  const room = await loadRoom(kv, code, now);
+  if (!room || room.hostKey !== hostKey) return null;
+  let changed = await mergeJoins(kv, room, now);
+  if (await advance(kv, room, now)) changed = true;
+  if (mutate) { const r = await mutate(room); if (r && r.changed) changed = true; }
+  if (changed) await kv.put(K.room(code), room);
+  return room;
+}
+
+// What phones see between host polls: an intro whose start time passed is already play.
+function asSeen(room, now) {
+  if (room.phase === 'intro' && room.round && now >= room.round.startsAt) return { ...room, phase: 'play' };
+  return room;
 }
 
 export async function createRoom(kv, packIn, now = Date.now()) {
@@ -75,9 +107,9 @@ export async function createRoom(kv, packIn, now = Date.now()) {
   for (let i = 0; i < 20; i++) {
     const code = String(1000 + crypto.randomInt(0, 9000));
     const room = { code, hostKey: id(16), pack, theme: pack === 'event' ? 'stage' : 'island', createdAt: now, teams: [], kicked: [], phase: 'lobby', roundIdx: -1, round: null, history: [], revealStep: 0, draws: [], draw: null };
-    const old = await kv.get(K.room(code));
-    if (old && now - old.data.createdAt <= ROOM_TTL) continue;
-    if (await kv.cas(K.room(code), room, old ? old.etag : null)) return { code, hostKey: room.hostKey };
+    if (await loadRoom(kv, code, now)) continue;
+    await kv.put(K.room(code), room);
+    return { code, hostKey: room.hostKey };
   }
   throw new Error('NO_FREE_CODE');
 }
@@ -199,12 +231,11 @@ async function onPlayer(kv, room, teamId, msg, now) {
   const r = room.round; if (!r || room.phase !== 'play') return null;
   if (now < r.startsAt || now > r.endsAt + 300) return null;
   const key = K.metric(room.code, r.seed, teamId);
-  for (let i = 0; i < 8; i++) {
-    if (i) await new Promise((r) => setTimeout(r, 3 + Math.random() * 15 * i));
+  {
     const rec = await kv.get(key);
     const m = rec ? rec.data : { value: 0, idx: 0, lockUntil: 0, best: [], last: 0, wrong: 0 };
     if (r.kind === 'count' && msg.t === 'count') {
-      const add = Math.max(0, Math.min(20, msg.n | 0));
+      const add = Math.max(0, Math.min(60, msg.n | 0)); // phones batch taps while a request is in flight
       const cap = Math.floor((now - r.startsAt) / 1000 * 18) + 5; // ~18/s ceiling against auto-clickers
       m.value = Math.min(cap, m.value + add);
     } else if (r.kind === 'quiz' && msg.t === 'answer') {
@@ -218,9 +249,9 @@ async function onPlayer(kv, room, teamId, msg, now) {
     } else if (r.kind === 'timing' && msg.t === 'timing') {
       const ms = Math.abs(msg.ms | 0); if (!(ms < 20000 && m.best.length < 3)) return m; m.best.push(ms);
     } else return null;
-    if (await kv.cas(key, m, rec ? rec.etag : null)) return m;
+    await kv.put(key, m);
+    return m;
   }
-  return null;
 }
 
 async function beat(kv, code, teamId, now) {
@@ -229,85 +260,91 @@ async function beat(kv, code, teamId, now) {
 }
 
 // ---------- public API ----------
-/** auth: { code, hostKey } for the host or { code, teamId, token } for a team. Returns messages for the caller. */
+/** auth: { code, hostKey[, view] } for a host screen or { code, teamId, token } for a team. Returns messages for the caller. */
 export async function poll(kv, auth, now = Date.now()) {
-  const { room } = await withRoom(kv, auth.code, now);
-  if (!room) return [NO_ROOM()];
   if (auth.hostKey !== undefined) {
-    if (auth.hostKey !== room.hostKey) return [NO_ROOM()];
-    return [await hostState(kv, room, now)];
+    // view: a second screen (the TV) only reads; the controlling screen advances and writes the room
+    const room = auth.view ? await loadRoom(kv, auth.code, now) : await hostRoom(kv, auth.code, auth.hostKey, now);
+    if (!room || room.hostKey !== auth.hostKey) return [NO_ROOM()];
+    return [await hostState(kv, auth.view ? asSeen(room, now) : room, now)];
   }
+  const room = await loadRoom(kv, auth.code, now);
+  if (!room) return [NO_ROOM()];
   const team = room.teams.find((t) => t.id === auth.teamId && t.token === auth.token);
   if (!team) return [(room.kicked || []).includes(String(auth.teamId)) ? { t: 'kicked' } : err('NO_TEAM', '팀 정보가 없어요. 다시 합류해 주세요.')];
   await beat(kv, room.code, team.id, now);
-  return [await playerState(kv, room, team.id, now)];
+  return [await playerState(kv, asSeen(room, now), team.id, now)];
 }
 
-export async function send(kv, auth, msg, now = Date.now()) {
+const JOIN_ERR = { FULL: () => err('FULL', `팀은 ${MAX_TEAMS}개까지 들어올 수 있어요.`), DUP: () => err('DUP', '같은 이름의 팀이 있어요. 다른 이름으로 해 주세요.') };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export async function send(kv, auth, msg, now = Date.now(), clock = Date.now) {
   if (!msg || typeof msg.t !== 'string') return [];
   const code = String(auth.code || '');
   if (msg.t === 'join') {
     const name = String(msg.name || '').trim().replace(/\s+/g, ' ').slice(0, 12);
     if (!name) return [err('NAME', '팀 이름을 적어 주세요.')];
-    const { room, result } = await withRoom(kv, code, now, (room) => {
-      if (room.teams.length >= MAX_TEAMS) return { e: err('FULL', `팀은 ${MAX_TEAMS}개까지 들어올 수 있어요.`) };
-      if (room.teams.some((t) => t.name === name)) return { e: err('DUP', '같은 이름의 팀이 있어요. 다른 이름으로 해 주세요.') };
-      const used = new Set(room.teams.map((t) => t.crew));
-      const free = Array.from({ length: 24 }, (_, i) => i + 1).filter((n) => !used.has(n));
-      const team = { id: id(6), token: id(16), name, crew: free[crypto.randomInt(0, free.length)] || 1, color: TEAM_COLORS[room.teams.length % TEAM_COLORS.length], score: 0, best: {}, joinedAt: now };
-      room.teams.push(team);
-      return { changed: true, team };
-    });
+    let room = await loadRoom(kv, code, now);
     if (!room) return [NO_ROOM()];
-    if (result.e) return [result.e];
-    await kv.put(K.seen(code, result.team.id), { at: now });
-    return [{ t: 'joined', teamId: result.team.id, token: result.team.token, code }, await playerState(kv, room, result.team.id, now)];
+    if (room.teams.length >= MAX_TEAMS) return [JOIN_ERR.FULL()];
+    if (room.teams.some((t) => t.name === name)) return [JOIN_ERR.DUP()];
+    const j = { id: id(6), token: id(16), name, at: now };
+    await kv.put(K.join(code, j.id), j);
+    const until = clock() + JOIN_WAIT_MS;
+    for (;;) {
+      room = await loadRoom(kv, code, now);
+      if (room && room.teams.some((t) => t.id === j.id)) {
+        const t = now + (clock() - (until - JOIN_WAIT_MS)); // the request's clock, advanced by the time spent waiting
+        await kv.put(K.seen(code, j.id), { at: t });
+        return [{ t: 'joined', teamId: j.id, token: j.token, code }, await playerState(kv, asSeen(room, t), j.id, t)];
+      }
+      const why = room && room.rejected && room.rejected[j.id];
+      if (why) return [JOIN_ERR[why]()];
+      if (clock() >= until) { await kv.del(K.join(code, j.id)); return [err('HOST_AWAY', '진행 화면이 응답하지 않아요. 진행 화면이 켜져 있는지 보고 다시 눌러 주세요.')]; }
+      await wait(350);
+    }
   }
   if (msg.t === 'host' || msg.t === 'rejoin') return poll(kv, auth, now);
   if (auth.hostKey !== undefined) {
-    const { room } = await withRoom(kv, code, now, async (room) => {
-      if (auth.hostKey !== room.hostKey) return null;
-      return onHost(room, msg, () => readMetrics(kv, room), now);
-    });
-    if (!room || auth.hostKey !== room.hostKey) return [NO_ROOM()];
+    if (auth.view) return poll(kv, auth, now); // the TV screen never changes the game
+    const room = await hostRoom(kv, code, auth.hostKey, now, (room) => onHost(room, msg, () => readMetrics(kv, room), now));
+    if (!room) return [NO_ROOM()];
     return [await hostState(kv, room, now)];
   }
-  const { room } = await withRoom(kv, code, now);
+  const room = await loadRoom(kv, code, now);
   if (!room) return [NO_ROOM()];
   const team = room.teams.find((t) => t.id === auth.teamId && t.token === auth.token);
   if (!team) return [err('NO_TEAM', '팀 정보가 없어요. 다시 합류해 주세요.')];
-  const progress = await onPlayer(kv, room, team.id, msg, now);
+  const progress = await onPlayer(kv, asSeen(room, now), team.id, msg, now);
   return progress ? [{ t: 'progress', progress, now }] : [];
 }
 
 export async function final(kv, code, hostKey, now = Date.now()) {
-  const { room } = await withRoom(kv, code, now);
+  const room = await loadRoom(kv, code, now);
   if (!room || hostKey !== room.hostKey) return null;
   return finalRows(room).map((t) => ({ id: t.id, name: t.name, color: t.color, crew: t.crew, score: t.score, place: t.place, praise: praiseFor(room, t) }));
 }
 
 // ---------- stores ----------
-/** In-memory store for local dev and tests (etag = revision counter). */
+/** In-memory store for local dev and tests. */
 export function memoryKV() {
-  const m = new Map(); let rev = 0;
+  const m = new Map();
   const clone = (v) => JSON.parse(JSON.stringify(v));
   return {
-    async get(k) { const e = m.get(k); return e ? { data: clone(e.data), etag: e.etag } : null; },
-    async cas(k, data, etag) { const e = m.get(k); if ((etag === null && e) || (etag !== null && (!e || e.etag !== etag))) return false; m.set(k, { data: clone(data), etag: String(++rev) }); return true; },
-    async put(k, data) { m.set(k, { data: clone(data), etag: String(++rev) }); },
+    async get(k) { return m.has(k) ? { data: clone(m.get(k)) } : null; },
+    async put(k, data) { m.set(k, clone(data)); },
+    async del(k) { m.delete(k); },
+    async list(prefix) { return [...m.keys()].filter((k) => k.startsWith(prefix)); },
   };
 }
 
-/** Netlify Blobs store (strong consistency, conditional writes by ETag). */
+/** Netlify Blobs store (strong consistency). */
 export function blobsKV(store) {
   return {
-    async get(k) {
-      const r = await store.getWithMetadata(k, { type: 'json' });
-      if (!r || r.data == null) return null;
-      if (!r.etag) throw new Error('NO_ETAG'); // never fall back to an unconditional write
-      return { data: r.data, etag: r.etag };
-    },
-    async cas(k, data, etag) { const r = await store.setJSON(k, data, etag === null ? { onlyIfNew: true } : { onlyIfMatch: etag }); return Boolean(r && r.modified); },
+    async get(k) { const d = await store.get(k, { type: 'json' }); return d == null ? null : { data: d }; },
     async put(k, data) { await store.setJSON(k, data); },
+    async del(k) { await store.delete(k); },
+    async list(prefix) { const { blobs } = await store.list({ prefix }); return blobs.map((b) => b.key); },
   };
 }

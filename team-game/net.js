@@ -2,9 +2,13 @@
 // Same surface the screens used with WebSocket: Net(onOpen, onMsg, onStatus) -> { send, now, offset, close }.
 // The first 'host' / 'rejoin' / 'join' message sets who we are; after that the client polls,
 // fast while a round runs and slow otherwise, and only hands the screen real changes.
+// Only one request is ever in flight per screen: the server relies on each key having one writer
+// that writes in order. Taps queued behind a slow request are merged into one message.
+// window.TG_VIEW_ONLY (the TV screen) polls as a read-only host.
 window.TG_API = new URL('api/', location.href).href;
 window.Net = function Net(onOpen, onMsg, onStatus) {
-  let auth = null, closed = false, timer = null, inflight = false, ok = null, fails = 0, last = null, lastPhase = 'lobby';
+  let auth = null, closed = false, timer = null, busy = false, ok = null, fails = 0, last = null, lastPhase = 'lobby';
+  const queue = [];
   const role = () => (auth && auth.hostKey ? 'host' : 'player');
   const api = {
     offset: 0,
@@ -12,13 +16,24 @@ window.Net = function Net(onOpen, onMsg, onStatus) {
     close() { closed = true; clearTimeout(timer); },
     drop() { last = null; },
     send(m) {
-      if (m.t === 'host') auth = { code: m.code, hostKey: m.hostKey };
+      if (m.t === 'host') auth = { code: m.code, hostKey: m.hostKey, ...(window.TG_VIEW_ONLY ? { view: true } : {}) };
       else if (m.t === 'rejoin') auth = { code: m.code, teamId: m.teamId, token: m.token };
       else if (m.t === 'join') auth = { code: m.code };
       if (!auth) return;
-      call('send', { auth, msg: m }).then(() => schedule(m.t === 'host' || m.t === 'rejoin' || m.t === 'join' ? 0 : 150));
+      const tail = queue[queue.length - 1];
+      if (m.t === 'count' && tail && tail.t === 'count') { tail.n = Math.min(60, tail.n + m.n); return; }
+      queue.push({ ...m }); pump();
     },
   };
+  async function pump() {
+    if (busy || !queue.length) return;
+    busy = true; clearTimeout(timer);
+    const m = queue.shift();
+    const sent = await call('send', { auth, msg: m });
+    if (!sent && m.t !== 'count' && m.t !== 'host' && m.t !== 'rejoin') queue.unshift(m); // retry commands and answers in order
+    busy = false;
+    if (queue.length) setTimeout(pump, sent ? 0 : 800); else schedule(m.t === 'host' || m.t === 'rejoin' || m.t === 'join' ? 0 : undefined);
+  }
   function status(v) { if (v !== ok) { ok = v; onStatus && onStatus(v); } }
   async function call(route, body) {
     const t0 = Date.now();
@@ -45,7 +60,7 @@ window.Net = function Net(onOpen, onMsg, onStatus) {
     last = { key, live: JSON.stringify(m.live || null), progress: JSON.stringify(m.progress || null) };
   }
   function interval() {
-    if (document.hidden) return 5000;
+    if (document.hidden) return role() === 'host' && !window.TG_VIEW_ONLY ? 2000 : 5000; // the controlling screen keeps rounds moving
     if (fails) return Math.min(5000, 600 * 2 ** (fails - 1));
     const busy = lastPhase === 'play' || lastPhase === 'intro';
     return role() === 'host' ? (busy ? 600 : 1500) : (busy ? 1000 : 1800);
@@ -53,8 +68,9 @@ window.Net = function Net(onOpen, onMsg, onStatus) {
   function schedule(ms) { clearTimeout(timer); if (!closed) timer = setTimeout(tick, ms === undefined ? interval() : ms); }
   async function tick() {
     if (closed) return;
-    if (!auth || !auth.token && !auth.hostKey || inflight) return schedule();
-    inflight = true; await call('poll', { auth }); inflight = false; schedule();
+    if (!auth || !auth.token && !auth.hostKey || busy || queue.length) return schedule();
+    busy = true; await call('poll', { auth }); busy = false;
+    if (queue.length) pump(); else schedule();
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(0); });
   setTimeout(() => { status(true); onOpen(api); }, 0);

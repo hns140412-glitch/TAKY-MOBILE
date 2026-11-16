@@ -14,7 +14,7 @@ function cleanAuth(a) {
   if (!a || typeof a !== 'object') return {};
   const s = (v, n) => (typeof v === 'string' ? v.slice(0, n) : undefined);
   const out = { code: s(a.code, 8) };
-  if (typeof a.hostKey === 'string') out.hostKey = s(a.hostKey, 32);
+  if (typeof a.hostKey === 'string') { out.hostKey = s(a.hostKey, 32); if (a.view === true) out.view = true; }
   else { out.teamId = s(a.teamId, 16); out.token = s(a.token, 32); }
   return out;
 }

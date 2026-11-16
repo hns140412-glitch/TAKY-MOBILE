@@ -20,6 +20,10 @@
   .ticket b { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 30px; letter-spacing: .1em; color: var(--ink); line-height: 1; }
   .net { width: 10px; height: 10px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--panel-solid); } .net.off { background: var(--bad); }
   .iconbtn { width: 44px; height: 44px; border-radius: 12px; background: var(--btn-bg); border: 2px solid var(--btn-line); color: var(--btn-ink); font-size: 18px; box-shadow: 0 3px 0 var(--btn-edge); }
+  .iconbtn svg { display: block; margin: auto; }
+  .iconbtn.on { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); }
+  .tv #cast, .tv #newroom { display: none !important; }
+  @media (min-width: 1600px) { html.tv { zoom: 1.25; } html.tv body { min-height: 80vh; } html.tv .app { height: 80vh; } } /* TV seen from the sofa: same layout as 1536x864, 25% bigger */
   main { position: relative; padding: 0 clamp(16px, 3vw, 36px) clamp(12px, 2vw, 22px); min-height: 0; }
   .screen { height: 100%; min-height: 0; animation: in var(--t-med) var(--ease-out); }
   @keyframes in { from { opacity: 0; transform: translateY(10px); } }
@@ -240,6 +244,7 @@
     <div class="brand"><span class="mk" id="mk"></span><b class="display">TAKY 팀게임</b><span class="pk hidden" id="packRib"></span></div>
     <span class="sp"></span>
     <span class="ticket hidden" id="codePill">방 번호 <b id="codeTxt"></b></span>
+    <button class="iconbtn hidden" id="cast" title="TV로 보내기 (크롬캐스트)" aria-label="TV로 보내기"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 17a4 4 0 0 1 4 4M2 13a8 8 0 0 1 8 8M2 9a12 12 0 0 1 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <button class="iconbtn" id="mute" title="소리 켜기·끄기" aria-label="소리 켜기·끄기">♪</button>
     <span class="net" id="net" title="연결 상태"></span>
   </header>
@@ -253,6 +258,10 @@
 const $ = (s, r = document) => r.querySelector(s);
 const main = $('#main');
 const params = new URLSearchParams(location.search);
+// TV screen opened by "TV로 보내기": the host key arrives in the hash once, is kept locally, then removed from the address.
+const TV = params.get('tv') === '1';
+if (TV && /^#k=/.test(location.hash) && params.get('r')) { store.set('tg.host', { code: params.get('r'), hostKey: decodeURIComponent(location.hash.slice(3)) }); history.replaceState(null, '', location.pathname + location.search); }
+if (TV) { document.documentElement.classList.add('tv'); window.TG_VIEW_ONLY = true; }
 let lastDrawAt = null, drawing = false;
 let S = null, net = null, selected = null, liveMax = 1, finalRows = null, lastPhase = null, lastRevealStep = -1, lastTeamCount = -1;
 const THEMES = [['island', '산마을'], ['stage', '무대'], ['paper', '종이']];
@@ -295,6 +304,26 @@ function renderSetup() {
   });
 }
 
+// ---------- TV (Google Cast via the Presentation API: Chrome sends this screen to a Chromecast / Google TV) ----------
+let castConn = null;
+function castable() { return !TV && 'PresentationRequest' in window && window.isSecureContext; }
+function paintCast() { const b = $('#cast'); b.classList.toggle('hidden', !castable() || !S); b.classList.toggle('on', !!castConn); b.title = castConn ? 'TV 연결 끊기' : 'TV로 보내기 (크롬캐스트)'; }
+const CAST_HELP = '크롬 메뉴 ⋮ → 전송… 으로 이 탭을 TV에 보낼 수 있어요';
+$('#cast').onclick = async () => {
+  if (castConn) { try { castConn.terminate(); } catch { /* already closed */ } return; }
+  const saved = store.get('tg.host'); if (!S || !saved) return;
+  const url = new URL(`index.html?r=${S.code}&tv=1&theme=${document.documentElement.dataset.theme || ''}#k=${encodeURIComponent(saved.hostKey)}`, location.href).href;
+  try {
+    const conn = await new PresentationRequest([url]).start();
+    castConn = conn; UI.setMuted(true); paintCast(); toast('TV에 진행 화면을 띄웠어요 · 소리는 TV에서 나요');
+    const done = () => { if (castConn !== conn) return; castConn = null; UI.setMuted(muted); paintCast(); toast('TV 연결이 끝났어요'); };
+    conn.addEventListener('terminate', done); conn.addEventListener('close', done);
+  } catch (e) {
+    if (e && e.name === 'NotAllowedError' && !/support/i.test(e.message || '')) return; // picker closed
+    toast(e && e.name === 'NotFoundError' ? 'TV를 찾지 못했어요 · 같은 와이파이인지 확인해 주세요' : CAST_HELP);
+  }
+};
+
 // ---------- connect ----------
 
 let offT = null; function netStatus(ok) { $('#net').classList.toggle('off', !ok); clearTimeout(offT); const b = document.getElementById('offline'); if (ok) { if (b) b.remove(); return; } offT = setTimeout(() => { if (!document.getElementById('offline')) document.body.insertAdjacentHTML('beforeend', '<div class="offline" id="offline" role="status">연결이 잠깐 끊겼어요 · 다시 잇는 중</div>'); }, 700); }
@@ -309,7 +338,7 @@ function onMsg(m) {
   if (m.t !== 'state') return;
   const prev = S; S = m; w = W(S.pack); document.body.dataset.pack = S.pack;
   if (!prev && S.theme && !params.get('theme')) UI.setThemeAttr(S.theme);
-  $('#codePill').classList.remove('hidden'); $('#codeTxt').textContent = S.code;
+  $('#codePill').classList.remove('hidden'); $('#codeTxt').textContent = S.code; paintCast();
   const rib = $('#packRib'); rib.classList.remove('hidden'); rib.textContent = w.packName;
   if (lastTeamCount >= 0 && S.teams.length > lastTeamCount) UI.sfx('join');
   lastTeamCount = S.teams.length;
