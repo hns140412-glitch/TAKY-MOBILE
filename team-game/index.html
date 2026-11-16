@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<script>if (!location.pathname.endsWith("/") && !/\.html$/.test(location.pathname)) location.replace(location.pathname + "/" + location.search);</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAKY 팀게임 · 진행 화면</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  body { min-height: 100vh; overflow: hidden; --art: url(art/scenes/camp-wide.webp); --art-filter: blur(2px) saturate(1.04); }
+  .app { position: relative; z-index: 1; height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+  header { position: relative; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 12px clamp(16px, 3vw, 36px); }
+  .brand { display: flex; align-items: center; gap: 10px; background: var(--panel-solid); border: 1px solid var(--panel-line); border-radius: 16px; padding: 5px 16px 5px 5px; box-shadow: var(--shadow-1); }
+  .brand .mk { width: 40px; height: 40px; border-radius: 12px; background: var(--pri-bg); color: var(--navy-ink); display: grid; place-items: center; box-shadow: var(--btn-3d); }
+  .brand .mk .ico { width: 28px; height: 28px; }
+  .brand b { font-size: var(--fs-lg); }
+  .brand .pk { font-size: var(--fs-xs); font-weight: 800; color: var(--ink-soft); border-left: 1px solid var(--line); padding-left: 10px; }
+  header .sp { flex: 1; }
+  .ticket { display: inline-flex; align-items: center; gap: 10px; padding: 6px 18px; background: var(--panel-solid); border-radius: 10px; border: 2px dashed var(--gold); box-shadow: var(--shadow-1); font-weight: 800; font-size: var(--fs-sm); color: var(--ink-soft); }
+  .ticket b { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 30px; letter-spacing: .1em; color: var(--ink); line-height: 1; }
+  .net { width: 10px; height: 10px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--panel-solid); } .net.off { background: var(--bad); }
+  .iconbtn { width: 44px; height: 44px; border-radius: 12px; background: var(--btn-bg); border: 2px solid var(--btn-line); color: var(--btn-ink); font-size: 18px; box-shadow: 0 3px 0 var(--btn-edge); }
+  main { position: relative; padding: 0 clamp(16px, 3vw, 36px) clamp(12px, 2vw, 22px); min-height: 0; }
+  .screen { height: 100%; min-height: 0; animation: in var(--t-med) var(--ease-out); }
+  @keyframes in { from { opacity: 0; transform: translateY(10px); } }
+  .ico { width: 100%; height: 100%; display: block; }
+  .itile { flex: none; display: grid; place-items: center; border-radius: 30%; background: var(--surface-2); color: var(--ink); border: 1px solid var(--panel-line); }
+  .itile.big { background: var(--pri-bg); color: var(--navy-ink); border: 0; box-shadow: var(--btn-3d), var(--shadow-1); }
+  .tabwrap { position: absolute; top: -22px; left: 0; right: 0; display: flex; justify-content: center; z-index: 2; pointer-events: none; }
+  .kbd { font-size: var(--fs-xs); color: var(--ink-soft); background: var(--panel-solid); border: 1px solid var(--panel-line); padding: 5px 12px; border-radius: var(--r-pill); }
+  .kbd kbd { font-family: inherit; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-solid); }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .bar .sp { flex: 1; }
+  .hand-note { font-family: var(--font-hand); font-size: 30px; line-height: 1.05; color: var(--ink); }
+
+  /* setup */
+  .setup { display: grid; place-items: center; height: 100%; }
+  .setup .box { width: min(1000px, 100%); text-align: center; }
+  .setup h1 { font-size: clamp(34px, 4.4vw, 58px); color: var(--ink); background: var(--panel-solid); display: inline-block; padding: 10px 28px 14px; border-radius: 20px; box-shadow: var(--panel-rule), var(--shadow-1); }
+  .setup p.lead { margin: 12px auto 0; font-size: var(--fs-md); font-weight: 700; background: var(--panel-solid); display: inline-block; padding: 6px 16px; border-radius: 999px; }
+  .packs { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 34px; text-align: left; }
+  .pack { position: relative; padding: 34px 26px 22px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; align-items: start; gap: 10px; transition: transform var(--t-fast) var(--ease-out); }
+  .pack:hover { transform: translateY(-3px); }
+  .pack h2 { font-size: var(--fs-xl); }
+  .pack p { margin-top: 8px; color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.55; }
+  .pack .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .pack .art { display: flex; align-items: flex-end; align-self: end; margin-right: -6px; }
+  .pack .art .ava { margin-left: -26px; }
+  .pack .art .emb { margin-left: -10px; transform: rotate(-6deg); }
+  .pack .art .emb:nth-child(2) { transform: rotate(5deg) translateY(-10px); }
+  .pack .go { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+  .themes { display: flex; justify-content: center; gap: 8px; margin-top: 22px; }
+  .themes .chip[aria-pressed="true"] { background: var(--navy); color: var(--navy-ink); border-color: transparent; }
+
+  /* lobby: signboard + mission trail + gathered crew */
+  .lobby { display: grid; grid-template-columns: minmax(280px, 25%) 1fr; gap: 26px; height: 100%; min-height: 0; padding-top: 6px; }
+  .join { position: relative; padding: 14px; display: flex; flex-direction: column; min-height: 0; }
+  .join .paper { flex: 1; min-height: 0; padding: 40px 18px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; }
+  .join .paper .nail.l { left: 10px; } .join .paper .nail.r { right: 10px; }
+  .join .qr { width: min(100%, 236px); aspect-ratio: 1; background: #fff; border-radius: 10px; padding: 10px; box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgba(0, 0, 0, .18); }
+  .join .qr img { width: 100%; height: 100%; display: block; }
+  .join .code { font-family: var(--font-display); font-size: 50px; line-height: 1; letter-spacing: .12em; color: #1E3A6E; }
+  .join .code small { display: block; font-family: var(--font-ui); font-size: var(--fs-xs); letter-spacing: 0; color: #4B5873; font-weight: var(--fw-strong); margin-bottom: 4px; }
+  .join .url { font-size: var(--fs-xs); color: #4B5873; word-break: break-all; }
+  .join .tabwrap { top: -6px; }
+  .join .snap { display: flex; align-items: center; gap: 4px; margin: -4px 0 -6px; transform: rotate(-3deg); }
+  .join .snap svg { width: 44px; height: 30px; transform: scaleX(-1) rotate(-10deg); }
+  .join .snap .hand-note { color: #1E2B4A; font-size: 28px; }
+  .join .callout { position: absolute; right: -18px; top: 46%; transform: rotate(-6deg); display: flex; flex-direction: column; align-items: flex-end; z-index: 3; }
+  .join .callout .hand-note { background: #FFF6C9; color: #1E2B4A; padding: 4px 12px 6px; border-radius: 4px; box-shadow: 0 4px 10px rgba(0, 0, 0, .2); font-size: 26px; }
+  .steps { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; color: #1E2B4A; }
+  .steps li { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: var(--fw-strong); line-height: 1.3; }
+  .steps b { width: 28px; height: 28px; border-radius: 50%; background: #1E3A6E; color: #FFF8EA; display: grid; place-items: center; font-family: var(--font-display); font-weight: 400; font-size: 16px; box-shadow: 0 2px 0 #0E2048; }
+  .right { display: grid; grid-template-rows: auto 1fr auto; gap: 12px; min-height: 0; }
+  .missions { position: relative; padding: 34px 18px 16px; margin-top: 18px; }
+  .missions .tabwrap { justify-content: flex-start; padding-left: 34px; }
+  .missions .sub { position: absolute; right: 18px; top: 10px; font-size: var(--fs-sm); color: var(--ink-soft); font-weight: 700; }
+  .trail { position: relative; }
+  .trail svg.path { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .rgrid { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px 14px; }
+  .rcard { position: relative; display: flex; align-items: center; gap: 8px; text-align: left; padding: 6px 8px 6px 10px; min-height: 58px; border-radius: 14px; background: var(--btn-bg); border: 2px solid var(--btn-line); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .5), 0 4px 0 var(--btn-edge); color: var(--btn-ink); transition: transform var(--t-fast) var(--ease-out); }
+  .rcard .no { position: absolute; top: -10px; left: -8px; width: 26px; height: 26px; border-radius: 50%; background: var(--pri-bg); color: var(--navy-ink); font-family: var(--font-display); font-size: 14px; display: grid; place-items: center; box-shadow: 0 2px 0 var(--pri-edge); }
+  .rcard .itile { width: 38px; height: 38px; padding: 5px; }
+  .rcard:hover { transform: translateY(-2px); }
+  .rcard[aria-pressed="true"] { background: var(--cta-bg); border-color: var(--cta-line); color: var(--cta-ink); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .6), 0 5px 0 var(--cta-edge), 0 0 0 5px color-mix(in srgb, var(--gold) 35%, transparent); transform: translateY(-3px); }
+  .rcard[aria-pressed="true"] .itile { background: #1E3A6E; color: #FFF8EA; border-color: transparent; }
+  .rcard[aria-pressed="true"] span.m { color: #4A3608; }
+  .rcard b { display: block; font-size: 14px; line-height: 1.2; }
+  .rcard span.m { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 2px; font-weight: 700; }
+  .rcard.done .itile { opacity: .55; }
+  .rcard.done::after { content: "완료"; position: absolute; top: -9px; right: -6px; font-size: 11px; font-weight: 800; color: #fff; background: #2C7A47; padding: 3px 8px; border-radius: 999px; transform: rotate(6deg); box-shadow: 0 2px 0 rgba(0, 0, 0, .2); }
+  .camp { position: relative; min-height: 0; display: flex; flex-direction: column; }
+  .camp .hd { display: flex; align-items: center; gap: 12px; position: relative; z-index: 4; }
+  .camp .hd .chip { background: var(--panel-solid); }
+  .crowd { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 30px 16px; position: relative; }
+  .crowd::before { content: ""; position: absolute; left: 4%; right: 4%; bottom: 4px; height: 46px; border-radius: 50%; background: radial-gradient(closest-side, rgba(62, 44, 20, .35), transparent); }
+  .team { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 -14px; animation: hop var(--t-slow) var(--ease-spring) both; }
+  .team .ava { position: relative; z-index: 2; }
+  .team.back { margin-bottom: 30px; } .team.back .ava { z-index: 1; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .18)) brightness(.96); }
+  .team .emb { position: relative; z-index: 2; margin-bottom: 8px; }
+  [data-pack="event"] .team { margin: 0 8px; } [data-pack="event"] .team.back { margin-bottom: 0; }
+  .team .flag { position: relative; z-index: 5; margin-top: -10px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; font-weight: var(--fw-strong); font-size: var(--fs-sm); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), 0 3px 0 rgba(0, 0, 0, .25); }
+  .team small { font-size: 12px; font-weight: 800; }
+  .team.off .ava, .team.off .emb { opacity: .45; filter: grayscale(1); }
+  .team.off .flag { background: var(--ink-soft) !important; color: var(--ink-invert) !important; }
+  @keyframes hop { 0% { transform: translateY(40px); opacity: 0; } 60% { transform: translateY(-8px); opacity: 1; } }
+  .empty { align-self: center; text-align: center; background: var(--panel-solid); padding: 16px 24px; border-radius: 18px; box-shadow: var(--panel-rule), var(--shadow-1); color: var(--ink-soft); font-size: var(--fs-md); font-weight: 700; position: relative; z-index: 1; }
+  .empty .hand-note { display: block; font-size: 34px; }
+
+  /* intro (comic countdown) / play */
+  .stagec { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 16px; min-height: 0; padding-top: 4px; }
+  .rtitle { display: flex; align-items: center; gap: 18px; padding: 12px 18px; }
+  .rtitle .itile { width: 70px; height: 70px; padding: 12px; }
+  .rtitle h2 { font-size: clamp(30px, 3.4vw, 46px); }
+  .rtitle p { font-size: var(--fs-md); color: var(--ink-soft); margin-top: 2px; font-weight: 600; }
+  .timer { margin-left: auto; width: 112px; height: 112px; position: relative; flex: none; margin-top: -10px; }
+  .timer .stopwatch { width: 100%; height: 100%; }
+  .timer b { position: absolute; left: 0; right: 0; top: 57%; transform: translateY(-50%); text-align: center; font-family: var(--font-display); font-size: 26px; color: #1E2B4A; font-variant-numeric: tabular-nums; }
+  .timer.low .stopwatch { animation: shake .5s ease-in-out infinite; }
+  .timer.low path[id] { fill: var(--bad); }
+  @keyframes shake { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+  .intro { height: 100%; display: grid; grid-template-rows: 1fr auto; min-height: 0; color: var(--comic-ink); }
+  .intro .mid { display: grid; grid-template-columns: 1.1fr auto auto; align-items: center; gap: clamp(20px, 4vw, 56px); padding: 0 3%; min-height: 0; }
+  .intro .head { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .intro .head .wrap-banner { margin-left: 20px; }
+  .intro .head h2 { font-size: clamp(48px, 6.4vw, 92px); line-height: 1.02; color: var(--comic-ink); }
+  .intro .head .how { font-family: var(--font-hand); font-size: clamp(28px, 2.6vw, 38px); line-height: 1.1; color: var(--comic-ink); max-width: 15em; }
+  .intro .head .how::before { content: "— "; }
+  .intro .sw { position: relative; width: clamp(220px, 26vw, 330px); aspect-ratio: 1; }
+  .intro .sw .stopwatch { width: 100%; height: 100%; filter: drop-shadow(0 10px 0 rgba(0, 0, 0, .12)); }
+  .intro .sw .n { position: absolute; left: 0; right: 0; top: 57%; transform: translateY(-50%); text-align: center; font-family: var(--font-display); font-size: clamp(60px, 7vw, 100px); line-height: 1; color: #1E2B4A; animation: beat 1s var(--ease-out) infinite; }
+  @keyframes beat { 0% { transform: translateY(-50%) scale(1.25); opacity: 0; } 25% { transform: translateY(-50%) scale(1); opacity: 1; } }
+  .intro .sw .tag { position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); white-space: nowrap; background: #1E3A6E; color: #FFF8EA; font-weight: 800; padding: 6px 16px; border-radius: 999px; font-size: var(--fs-sm); box-shadow: 0 3px 0 #0E2048; }
+  .intro .dm-cap { background: #FFF8EA; color: #1E2B4A; }
+  .ground { position: relative; display: flex; justify-content: center; align-items: flex-end; padding: 8px 0 0; }
+  .lineup { position: relative; display: flex; justify-content: center; align-items: flex-end; }
+  .lineup .ava { margin: 0 -16px; animation: bob 1.2s ease-in-out infinite; }
+  .lineup .emb { margin: 0 4px 10px; animation: bob 1.2s ease-in-out infinite; }
+  .lineup > :nth-child(2n) { animation-delay: -.6s; margin-bottom: 18px; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .race { position: relative; min-height: 0; overflow: hidden; padding: 16px 22px; }
+  .race .in { position: relative; height: 100%; }
+  .lane { position: absolute; left: 0; right: 0; display: grid; grid-template-columns: 220px 1fr 132px; gap: 16px; align-items: center; transition: transform var(--t-slow) var(--ease-out); }
+  .lane .nm { display: flex; align-items: center; gap: 10px; font-weight: var(--fw-strong); font-size: var(--fs-md); white-space: nowrap; min-width: 0; }
+  .lane .nm span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .lane .pl { width: 34px; height: 34px; font-size: 17px; }
+  .lane .trk { position: relative; height: 100%; border-radius: var(--r-pill); background: linear-gradient(90deg, transparent calc(100% - 46px), rgba(0, 0, 0, .06) calc(100% - 46px)), var(--bar-track); box-shadow: inset 0 3px 0 rgba(0, 0, 0, .08); }
+  .lane .trk::before { content: ""; position: absolute; left: 14px; right: 56px; top: 50%; border-top: 3px dashed color-mix(in srgb, var(--ink-soft) 45%, transparent); }
+  .lane .trk .fin { position: absolute; right: 8px; top: 50%; transform: translateY(-62%); width: 34px; height: 34px; color: var(--ink); }
+  .lane .fill { height: 100%; width: 0; border-radius: var(--r-pill); transition: width 250ms linear; position: relative; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .16), inset 0 3px 0 rgba(255, 255, 255, .3); background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, .16) 0 10px, transparent 10px 20px) !important; }
+  .lane .rider { position: absolute; bottom: 0; left: 0; transform: translateX(-50%); transition: left 250ms linear; pointer-events: none; display: flex; align-items: flex-end; z-index: 2; }
+  .lane .v { white-space: nowrap; font-family: var(--font-display); font-size: var(--fs-xl); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* result */
+  .result { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; height: 100%; min-height: 0; padding-top: 18px; }
+  .stand { position: relative; display: grid; grid-template-rows: auto 1fr; padding: 40px 22px 0; }
+  .stand .podium { overflow: hidden; border-radius: 0 0 var(--r-lg) var(--r-lg); margin: 0 -22px; padding: 0 22px; }
+  .stand .ttl { text-align: center; }
+  .stand .ttl h2 { font-size: clamp(28px, 3.2vw, 44px); }
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 14px; min-height: 0; }
+  .pod { width: 31%; max-width: 210px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+  .pod .ava { animation: drop var(--t-slow) var(--ease-spring) both; animation-delay: .25s; margin-bottom: -6px; position: relative; z-index: 1; }
+  .pod .emb { margin-bottom: 8px; animation: drop var(--t-slow) var(--ease-spring) both; animation-delay: .25s; }
+  @keyframes drop { from { transform: translateY(-50px); opacity: 0; } }
+  .pod .blk { width: 100%; border-radius: 10px 10px 0 0; display: flex; flex-direction: column; align-items: center; padding-top: 2px; color: #2A2100; position: relative; box-shadow: inset 0 -12px 0 rgba(0, 0, 0, .14), inset 0 0 0 3px rgba(255, 255, 255, .25); animation: rise var(--t-slow) var(--ease-spring) both; transform-origin: bottom; }
+  .pod .blk::before { content: ""; position: absolute; left: -6px; right: -6px; top: -10px; height: 14px; border-radius: 8px; background: inherit; filter: brightness(1.12); box-shadow: 0 3px 0 rgba(0, 0, 0, .15); }
+  .pod .blk .rosette { margin-top: -2px; position: relative; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .18)); }
+  .pod .blk .nm { font-weight: 800; font-size: var(--fs-md); margin-top: 2px; padding: 0 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2A2100; }
+  .pod .blk .val { font-size: var(--fs-xs); color: #3D3112; font-weight: var(--fw-strong); margin-top: 2px; }
+  @keyframes rise { from { transform: scaleY(0); } }
+  .rlist { overflow: auto; padding: 18px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .row { display: grid; grid-template-columns: 38px 46px 1fr auto auto; gap: 12px; align-items: center; padding: 6px 10px; border-radius: 14px; background: var(--btn-bg); border: 2px solid var(--btn-line); box-shadow: 0 3px 0 var(--btn-edge); color: var(--btn-ink); }
+  .row .pl { width: 36px; height: 36px; font-size: 18px; }
+  .row .av { height: 46px; display: grid; place-items: end center; }
+  .row .av .ava { height: 46px; }
+  .row .who { font-weight: 800; min-width: 0; }
+  .row .who small { display: block; font-weight: 600; font-size: var(--fs-xs); color: var(--ink-soft); }
+  .row .pt { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--accent); }
+  .row .adj { display: flex; gap: 4px; }
+  .row .adj button { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); font-weight: 800; color: var(--ink); }
+  .rlist .bar { margin-top: auto; padding-top: 10px; }
+
+  /* final */
+  .final { height: 100%; display: grid; grid-template-rows: auto 1fr auto; gap: 14px; min-height: 0; }
+  .final .ttl { text-align: center; padding-top: 4px; }
+  .final .ttl .hand-note { margin-top: 8px; display: inline-block; background: var(--panel-solid); padding: 2px 14px 4px; border-radius: 999px; }
+  .reveal { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px); mask-image: linear-gradient(to bottom, transparent 0, #000 26px); display: flex; flex-direction: column-reverse; gap: 10px; overflow: auto; align-items: center; justify-content: flex-start; padding: 4px 4px 12px; }
+  .rv { width: min(760px, 100%); display: grid; grid-template-columns: 46px 64px 1fr auto; gap: 14px; align-items: center; padding: 8px 20px; animation: flip var(--t-slow) var(--ease-spring) both; flex: none; border-radius: 16px; background: var(--btn-bg); border: 2px solid var(--btn-line); box-shadow: 0 4px 0 var(--btn-edge), var(--shadow-1); color: var(--btn-ink); }
+  @keyframes flip { from { transform: rotateX(80deg) translateY(20px); opacity: 0; } }
+  .rv .pl { width: 42px; height: 42px; font-size: var(--fs-lg); }
+  .rv .av { height: 64px; display: grid; place-items: end center; }
+  .rv .av .ava { height: 64px; }
+  .rv .nm { font-size: var(--fs-lg); font-weight: 800; }
+  .rv .pr { font-family: var(--font-hand); font-size: 24px; color: var(--ink-soft); line-height: 1.1; margin-top: 2px; }
+  .rv .sc { font-family: var(--font-display); font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+  .rv.win { width: min(940px, 100%); grid-template-columns: 110px 170px 1fr auto; padding: 12px 30px 12px 16px; background: linear-gradient(180deg, #FFFBEE, #FCEFC8); color: #1E2B4A; border: 3px solid #C9952B; box-shadow: inset 0 0 0 4px #FFFBEE, inset 0 0 0 6px rgba(201, 149, 43, .6), 0 5px 0 #A06A0E, 0 0 0 8px color-mix(in srgb, var(--gold) 28%, transparent), var(--shadow-2); position: relative; }
+  .rv.win .ros { display: grid; place-items: center; }
+  .rv.win .av { height: 170px; position: relative; }
+  .rv.win .av .ava { height: 170px; }
+  .rv.win .av .crown { position: absolute; top: -30px; left: 50%; transform: translateX(-50%) rotate(-8deg); width: 64px; height: 50px; filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .2)); }
+  .rv.win .nm { font-family: var(--font-display); font-weight: var(--fw-display); font-size: var(--fs-2xl); }
+  .rv.win .pr { font-size: 32px; color: #1E2B4A; }
+  .rv.win .sc { font-size: var(--fs-2xl); color: #2F5DA8; }
+  .rv.win .wrap-banner { margin: 0 0 6px 16px; }
+  .rv.win .banner { height: 34px; font-size: 18px; padding: 0 18px; }
+  .rv.win .banner::before, .rv.win .banner::after { top: 7px; width: 18px; }
+  .rv.win .banner::before { left: -13px; } .rv.win .banner::after { right: -13px; }
+  .tiebox { display: flex; gap: 22px; justify-content: center; width: 100%; flex: none; padding: 30px 14px 6px; }
+  .rv.win.tie { width: auto; flex: 1 1 0; max-width: 270px; grid-template-columns: 1fr; justify-items: center; text-align: center; gap: 4px; padding: 14px 14px 16px; }
+  .rv.win.tie .ros { position: absolute; left: 6px; top: -14px; }
+  .rv.win.tie .av, .rv.win.tie .av .ava { height: 120px; } .rv.win.tie .av { display: grid; place-items: end center; }
+  .rv.win.tie .av .crown { top: -26px; width: 46px; height: 36px; } .rv.win.tie .nm { font-size: var(--fs-xl); } .rv.win.tie .pr { font-size: 22px; } .rv.win.tie .sc { font-size: var(--fs-xl); }
+  .rv.win.tie .wrap-banner { margin: 4px 0 2px; }
+  @media (max-height: 740px) { .rv.win .av, .rv.win .av .ava { height: 140px; } .rv.win { grid-template-columns: 96px 140px 1fr auto; } .rv .av, .rv .av .ava { height: 52px; } .rv { padding: 5px 20px; } .rv.win.tie .av, .rv.win.tie .av .ava { height: 96px; } .banner.lg { height: 56px; font-size: 30px; } }
+  /* event pack: marquee bulbs around the winner (case review: game-show stage) */
+  [data-theme="stage"] .rv.win { background: linear-gradient(180deg, #2A2460, #1A1840); color: #FFF; border-color: #FFC83D; box-shadow: inset 0 0 0 4px #1A1840, 0 5px 0 #8A6400, var(--shadow-2); }
+  [data-theme="stage"] .rv.win .pr { color: #E4E2FF; } [data-theme="stage"] .rv.win .sc { color: #FFC83D; }
+  [data-theme="stage"] .rv.win::before { content: ""; position: absolute; inset: -14px; border-radius: 24px; padding: 8px; background: radial-gradient(circle, #FFF3C2 0 3.5px, #FFC83D 4.5px, transparent 5.5px) 0 0 / 22px 22px, #3A2C00; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); z-index: -1; animation: bulbs 1s steps(2) infinite; }
+  @keyframes bulbs { 50% { background-position: 11px 0, 0 0; } }
+  .pl { display: grid; place-items: center; }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+  .drawfx { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(20, 24, 50, .55); }
+  .drawfx .dcard { position: relative; width: min(560px, 90vw); padding: 44px 30px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .drawfx .slot { height: 270px; display: grid; place-items: end center; }
+  .drawfx .dname { font-size: 46px; min-height: 1.2em; }
+  .drawfx .dname small { font-size: 30px; color: var(--accent); }
+  .drawfx.done .dcard { border: 3px solid var(--gold); box-shadow: var(--panel-rule), 0 0 0 8px color-mix(in srgb, var(--gold) 30%, transparent), var(--shadow-2); }
+  .drawfx.done .slot { animation: drop var(--t-slow) var(--ease-spring); }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 10px 16px; border-radius: var(--r-pill); background: var(--ink); color: var(--ink-invert); font-weight: var(--fw-strong); font-size: var(--fs-sm); z-index: 60; }
+  @media (max-width: 860px) {
+    body { overflow: auto; } .app { height: auto; min-height: 100vh; }
+    .lobby, .result { grid-template-columns: 1fr; } .packs { grid-template-columns: 1fr; } .rgrid { grid-template-columns: repeat(2, 1fr); }
+    .lane { grid-template-columns: 120px 1fr 64px; } .intro .mid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><span class="mk" id="mk"></span><b class="display">TAKY 팀게임</b><span class="pk hidden" id="packRib"></span></div>
+    <span class="sp"></span>
+    <span class="ticket hidden" id="codePill">방 번호 <b id="codeTxt"></b></span>
+    <button class="iconbtn" id="mute" title="소리 켜기·끄기" aria-label="소리 켜기·끄기">♪</button>
+    <span class="net" id="net" title="연결 상태"></span>
+  </header>
+  <main id="main"></main>
+</div>
+<canvas id="fx"></canvas>
+<script src="net.js"></script>
+<script src="ui.js"></script>
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const main = $('#main');
+const params = new URLSearchParams(location.search);
+let lastDrawAt = null, drawing = false;
+let S = null, net = null, selected = null, liveMax = 1, finalRows = null, lastPhase = null, lastRevealStep = -1, lastTeamCount = -1;
+const THEMES = [['island', '산마을'], ['stage', '무대'], ['paper', '종이']];
+$('#mk').innerHTML = UI.icon('compass');
+function setTheme(t) { UI.setThemeAttr(t); store.set('tg.theme', t); if (net && S) net.send({ t: 'theme', theme: t }); }
+setTheme(params.get('theme') || store.get('tg.theme') || 'island');
+let muted = !!store.get('tg.mute'); UI.setMuted(muted);
+const paintMute = () => { $('#mute').style.opacity = muted ? .4 : 1; $('#mute').textContent = muted ? '♪̸' : '♪'; };
+paintMute(); $('#mute').onclick = () => { muted = !muted; store.set('tg.mute', muted); UI.setMuted(muted); paintMute(); };
+
+// Words change with the pack: learning = expedition story, event = plain team-game words.
+const W = (pack) => pack === 'event'
+  ? { team: '팀', teams: '들어온 팀', round: '라운드', camp: '참가 접수', champ: '오늘의 우승 팀!', result: '라운드 결과', go: '이 라운드 시작', next: '다음 라운드 고르기', lineup: '모두 준비됐나요?', packName: '행사 팩', empty: '팀마다 폰 한 대로 QR을 찍어 주세요' }
+  : { team: '탐험대', teams: '모인 탐험대', round: '미션', camp: '탐험대 모집', champ: '오늘의 최고 탐험대!', result: '미션 결과', go: '이 미션 출발', next: '다음 미션 고르기', lineup: '탐험대, 출발 준비!', packName: '학습 팩 · 탐험', empty: '탐험대마다 폰 한 대로 QR을 찍으면 대원이 나타나요' };
+let w = W('learn');
+
+function toast(t) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2200); }
+const ava = (t, h) => UI.avatar(t, h, S ? S.pack : 'learn');
+
+// ---------- setup ----------
+function renderSetup() {
+  const crewArt = [3, 11, 19].map((n, i) => `<img class="ava" src="art/crew/${String(n).padStart(2, '0')}.webp" alt="" style="height:${[118, 132, 112][i]}px">`).join('');
+  const embArt = [['#FF7A59', '번'], ['#3E7BFA', '파'], ['#9B5DE5', '별']].map(([c, ch]) => `<span class="emb" style="width:64px;height:64px;font-size:30px;background:${c};color:${UI.inkOn(c)}">${ch}</span>`).join('');
+  main.innerHTML = `<section class="screen setup"><div class="box">
+    <h1 class="display">큰 화면 하나, 폰 여러 대<br>팀으로 같이 놀아요</h1>
+    <p class="lead">팀마다 폰 한 대로 QR을 찍으면 바로 들어와요. 점수와 순위는 화면이 알아서 세요.</p>
+    <div class="packs">
+      <button class="pack panel" data-pack="learn"><div><h2 class="display">학습 팩 · 탐험대</h2><p>초성 낱말, 영어 짝꿍, 한자 뜻 찾기처럼 배운 것을 꺼내 쓰는 미션에 몸·반응·퍼즐 놀이를 섞었어요. 팀마다 탐험 크루 대원이 함께 뛰어요.</p><div class="tags"><span class="chip">가족 거실</span><span class="chip">교실</span><span class="chip">미션 10종</span></div></div><div class="art">${crewArt}</div><span class="btn cta go">탐험 시작</span></button>
+      <button class="pack panel" data-pack="event"><div><h2 class="display">행사 팩</h2><p>색깔 함정, O X 퀴즈, 초록불 반응처럼 설명 없이 바로 웃게 되는 라운드. 워크숍·모임·체육대회용.</p><div class="tags"><span class="chip">회사·단체</span><span class="chip">최대 16팀</span><span class="chip">라운드 9종</span></div></div><div class="art">${embArt}</div><span class="btn primary go">행사 열기</span></button>
+    </div>
+    <div class="themes" role="group" aria-label="테마">${THEMES.map(([k, n]) => `<button class="chip" data-theme-pick="${k}" aria-pressed="${document.documentElement.dataset.theme === k}">${n}</button>`).join('')}</div>
+  </div></section>`;
+  main.querySelectorAll('[data-theme-pick]').forEach((b) => b.onclick = () => { setTheme(b.dataset.themePick); store.set('tg.themePicked', true); renderSetup(); });
+  main.querySelectorAll('[data-pack]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    const r = await fetch(TG_API + 'room?pack=' + b.dataset.pack, { method: 'POST' }).then((x) => x.json()).catch(() => null);
+    if (!r) { b.disabled = false; return toast('방을 만들지 못했어요. 인터넷 연결을 확인해 주세요'); }
+    if (!params.get('theme') && !store.get('tg.themePicked')) setTheme(b.dataset.pack === 'event' ? 'stage' : 'island');
+    store.set('tg.host', r); location.search = '?r=' + r.code;
+  });
+}
+
+// ---------- connect ----------
+
+let offT = null; function netStatus(ok) { $('#net').classList.toggle('off', !ok); clearTimeout(offT); const b = document.getElementById('offline'); if (ok) { if (b) b.remove(); return; } offT = setTimeout(() => { if (!document.getElementById('offline')) document.body.insertAdjacentHTML('beforeend', '<div class="offline" id="offline" role="status">연결이 잠깐 끊겼어요 · 다시 잇는 중</div>'); }, 700); }
+const saved = store.get('tg.host');
+if (params.get('r') && saved && saved.code === params.get('r')) {
+  net = Net((n) => n.send({ t: 'host', code: saved.code, hostKey: saved.hostKey }), onMsg, netStatus);
+} else renderSetup();
+
+function onMsg(m) {
+  if (m.t === 'error') { if (m.code === 'NO_ROOM') { store.del('tg.host'); location.search = ''; } return; }
+  if (m.t === 'live') { if (S && S.phase === 'play') { S.live = m.live; paintRace(); } return; }
+  if (m.t !== 'state') return;
+  const prev = S; S = m; w = W(S.pack); document.body.dataset.pack = S.pack;
+  if (!prev && S.theme && !params.get('theme')) UI.setThemeAttr(S.theme);
+  $('#codePill').classList.remove('hidden'); $('#codeTxt').textContent = S.code;
+  const rib = $('#packRib'); rib.classList.remove('hidden'); rib.textContent = w.packName;
+  if (lastTeamCount >= 0 && S.teams.length > lastTeamCount) UI.sfx('join');
+  lastTeamCount = S.teams.length;
+  if (S.draw && S.draw.at !== lastDrawAt) { const first = lastDrawAt === null && S.now - S.draw.at > 20000; lastDrawAt = S.draw.at; if (!first) runDraw(); }
+  if (S.phase !== lastPhase || S.phase === 'lobby' || S.phase === 'result' || (S.phase === 'final' && S.revealStep !== lastRevealStep)) render(prev);
+  lastPhase = S.phase; lastRevealStep = S.revealStep;
+}
+
+function render() {
+  ({ lobby: renderLobby, intro: renderIntro, play: renderPlay, result: renderResult, final: renderFinal })[S.phase]();
+}
+
+// ---------- lobby ----------
+function joinUrl() { return new URL(`play.html?r=${S.code}`, location.href).href; }
+function nextUnplayed() { return S.rounds.find((r) => !S.played.includes(r.id)) || S.rounds[0]; }
+function bunting(teams) {
+  const cols = teams.length ? teams.map((t) => t.color) : ['var(--accent)', 'var(--gold)', 'var(--accent-2)', 'var(--good)'];
+  const n = 26, step = 1000 / n;
+  return `<svg class="bunting" viewBox="0 0 1000 30" preserveAspectRatio="none" aria-hidden="true"><path d="M0 4 Q500 22 1000 4" stroke="var(--ink-soft)" stroke-width="1.2" fill="none" opacity=".5"/>${Array.from({ length: n }, (_, i) => { const x = i * step + step / 2, y = 4 + 18 * (1 - ((x - 500) / 500) ** 2) * .82; return `<path d="M${x - 12} ${y - 1}L${x + 12} ${y - 1}L${x} ${y + 17}z" fill="${cols[i % cols.length]}"/>`; }).join('')}</svg>`;
+}
+function crewSize(n) { return S.pack === 'event' ? (n <= 8 ? 104 : 72) : n <= 5 ? 220 : n <= 8 ? 170 : n <= 12 ? 128 : 100; }
+function trailPath(n, cols) {
+  // dotted trail that snakes through the mission tiles (row 1 left→right, row 2 right→left)
+  const rows = Math.ceil(n / cols), pts = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const i = r * cols + c; if (i >= n) break; const cc = r % 2 ? cols - 1 - c : c; pts.push([(cc + .5) * (1000 / cols), (r + .5) * (200 / rows)]); }
+  return `<svg class="path" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true"><path d="M${pts.map((p) => p.join(' ')).join(' L')}" fill="none" stroke="var(--wood)" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".7"/></svg>`;
+}
+function renderLobby() {
+  if (!selected || !S.rounds.some((r) => r.id === selected)) selected = nextUnplayed().id;
+  const order = ['body', 'react', 'rule', 'puzzle', 'brain'];
+  const rounds = [...S.rounds].sort((a, b) => order.indexOf(a.family) - order.indexOf(b.family));
+  const sz = crewSize(S.teams.length), cols = rounds.length > 15 ? 6 : 5;
+  const teamsHtml = S.teams.length ? S.teams.map((t, i) => `<div class="team ${i % 2 ? 'back' : ''} ${t.online ? '' : 'off'}" title="${esc(t.name)}">${ava(t, i % 2 ? Math.round(sz * .88) : sz)}<span class="flag" style="background:${t.color};color:${UI.inkOn(t.color)}">${esc(t.name)} <small>${t.online ? t.score + '점' : '연결 끊김'}</small></span></div>`).join('') : `<p class="empty"><span class="hand-note">아직 아무도 안 왔어요</span>${w.empty}</p>`;
+  main.innerHTML = `<section class="screen lobby">
+    <div class="wood join">
+      <div class="paper"><i class="nail l"></i><i class="nail r"></i>
+        <div class="tabwrap"><span class="banner">${UI.icon('flag')}${w.camp}</span></div>
+        <div class="qr"><img alt="참가 QR" src="${TG_API}qr.svg?u=${encodeURIComponent(joinUrl())}"></div>
+        <p class="snap"><svg viewBox="0 0 60 40" aria-hidden="true"><path d="M6 34C14 20 30 10 50 8m0 0l-9-4m9 4l-6 8" fill="none" stroke="#F08A3C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="hand-note">폰 카메라로 찰칵!</span></p>
+        <div class="code"><small>방 번호</small>${S.code}</div>
+        <ol class="steps"><li><b>1</b>폰 카메라로 QR</li><li><b>2</b>팀 이름 적기</li><li><b>3</b>큰 화면 보기</li></ol>
+        <p class="url">${esc(joinUrl())}</p>
+      </div>
+    </div>
+    <div class="right">
+      <div class="panel missions"><div class="tabwrap"><span class="banner">${UI.icon('order')}오늘의 ${w.round} 지도</span></div><span class="sub">${w.round} ${S.played.length}/${S.rounds.length} 완료 · 눌러서 고르고 <kbd style="font:inherit">Space</kbd></span>
+        <div class="trail">${trailPath(rounds.length, cols)}<div class="rgrid" style="grid-template-columns:repeat(${cols},1fr)">${rounds.map((r, i) => `<button class="rcard ${S.played.includes(r.id) ? 'done' : ''}" data-r="${r.id}" aria-pressed="${selected === r.id}" title="${esc(r.how)}"><span class="no">${i + 1}</span><span class="itile">${UI.icon(r.id)}</span><span><b>${esc(r.title)}</b><span class="m">${esc(r.familyName)} · ${r.seconds}초</span></span></button>`).join('')}</div></div></div>
+      <div class="camp"><div class="hd"><span class="wrap-banner"><span class="banner">${w.teams} ${S.teams.length}</span></span>${S.teams.length ? '' : '<span class="chip">앱 설치·가입 없이 · 팀당 폰 1대</span>'}</div><div class="crowd">${teamsHtml}</div></div>
+      <div class="bar">
+        <button class="btn cta" id="go" ${S.teams.length ? '' : 'disabled'}>${w.go}</button>
+        <button class="btn primary" id="fin" ${S.played.length ? '' : 'disabled'}>최종 발표</button>
+        <span class="sp"></span>
+        <span class="kbd"><kbd>Space</kbd> 시작·다음 · <kbd>←</kbd><kbd>→</kbd> 고르기</span>
+        <button class="btn" id="undo" ${S.played.length ? '' : 'disabled'} title="마지막 ${w.round} 점수 되돌리기">되돌리기</button>
+        <button class="btn" id="theme">테마</button>
+        <button class="btn" id="newroom">새 방</button>
+      </div>
+    </div></section>`;
+  main.querySelectorAll('.rcard').forEach((b) => b.onclick = () => { selected = b.dataset.r; renderLobby(); });
+  $('#go').onclick = () => net.send({ t: 'start', round: selected });
+  $('#fin').onclick = () => net.send({ t: 'final' });
+  $('#undo').onclick = () => { net.send({ t: 'undo' }); toast(`마지막 ${w.round} 점수를 되돌렸어요`); };
+  $('#theme').onclick = () => { const i = THEMES.findIndex(([k]) => k === document.documentElement.dataset.theme); setTheme(THEMES[(i + 1) % THEMES.length][0]); store.set('tg.themePicked', true); };
+  $('#newroom').onclick = () => { if (confirmLike('새 방을 만들면 지금 점수는 남지 않아요')) { store.del('tg.host'); location.search = ''; } };
+}
+let confirmArm = 0;
+function confirmLike(text) { if (Date.now() - confirmArm < 3000) return true; confirmArm = Date.now(); toast(text + ' · 한 번 더 누르면 진행해요'); return false; }
+
+// ---------- intro ----------
+let tick = null;
+function titleBar(r, extra = '') { return `<div class="panel rtitle"><span class="itile big">${UI.icon(r.id)}</span><div><h2 class="display">${esc(r.title)}</h2><p>${esc(r.how)}${r.better === 'low' ? ' · 빠를수록 좋아요' : ''}</p></div>${extra}</div>`; }
+function renderIntro() {
+  const r = S.round, idx = S.played.length + 1;
+  const line = S.teams.slice(0, 12).map((t) => ava(t, S.pack === 'event' ? 76 : S.teams.length <= 6 ? 150 : 112)).join('');
+  main.innerHTML = `${UI.comic()}<section class="screen intro" style="position:relative;z-index:1">
+    <div class="mid">
+      <div class="head"><span class="wrap-banner"><span class="banner">${UI.icon(r.id)}${w.round} ${idx}</span></span><h2 class="display">${esc(r.title)}</h2><p class="how">${esc(r.how)}${r.better === 'low' ? ' · 빠를수록 좋아요' : ''}</p></div>
+      <div class="sw">${UI.stopwatch('cw')}<div class="n" id="cn">5</div><span class="tag">${w.lineup} 폰을 들어요</span></div>
+      ${UI.demo(r.id, S.teams[0] && S.teams[0].color)}
+    </div>
+    <div class="ground"><div class="lineup">${line}</div></div></section>`;
+  clearInterval(tick); let lastN = null;
+  tick = setInterval(() => { const ms = r.startsAt - net.now(), left = Math.ceil(ms / 1000); const el = $('#cn'); if (!el) return clearInterval(tick); const cw = $('#cw'); if (cw) cw.setAttribute('d', UI.wedge(ms / 5000)); const v = left > 0 ? left : '시작!'; if (v !== lastN) { lastN = v; el.textContent = v; UI.sfx(left > 0 ? 'tick' : 'go'); } }, 100);
+}
+// ---------- play ----------
+function renderPlay() {
+  const r = S.round; liveMax = 1;
+  main.innerHTML = `<section class="screen stagec">${titleBar(r, `<div class="timer" id="tm">${UI.stopwatch('tv')}<b id="tl"></b></div>`)}
+    <div class="panel race" id="race"><div class="in" id="rin"></div></div></section>`;
+  clearInterval(tick); let lastS = null;
+  tick = setInterval(() => {
+    const total = r.endsAt - r.startsAt, left = Math.max(0, r.endsAt - net.now());
+    const tl = $('#tl'), tv = $('#tv'); if (!tl) return clearInterval(tick);
+    const s = Math.ceil(left / 1000); tl.textContent = s; tv.setAttribute('d', UI.wedge(left / total));
+    $('#tm').classList.toggle('low', left < 4000);
+    if (s !== lastS) { if (s <= 3 && s > 0) UI.sfx('tick'); if (s === 0 && lastS !== null) UI.sfx('end'); lastS = s; }
+  }, 100);
+  paintRace();
+}
+function paintRace() {
+  const race = $('#rin'); if (!race || !S.round) return;
+  const low = S.round.better === 'low';
+  const rows = S.teams.map((t) => ({ t, v: (S.live || []).find((x) => x.teamId === t.id)?.value ?? null }));
+  const vals = rows.map((x) => x.v).filter((v) => v !== null);
+  liveMax = Math.max(liveMax, ...vals, 1);
+  rows.sort((a, b) => (a.v === null) - (b.v === null) || (low ? a.v - b.v : b.v - a.v));
+  const H = race.clientHeight, n = Math.max(rows.length, 1), lh = Math.min(120, H / n), bh = Math.max(14, lh * 0.5), rh = Math.min(lh * 0.95, 100);
+  rows.forEach((x, i) => {
+    let el = race.querySelector(`[data-t="${x.t.id}"]`);
+    if (!el) { el = document.createElement('div'); el.className = 'lane'; el.dataset.t = x.t.id; el.innerHTML = `<div class="nm"><span class="pl medal-b mx"></span><span>${esc(x.t.name)}</span></div><div class="trk"><span class="fin">${UI.icon('flag')}</span><div class="fill" style="background-color:${x.t.color}"></div><div class="rider">${ava(x.t, rh)}</div></div><div class="v"></div>`; race.appendChild(el); }
+    el.style.height = bh + 'px'; el.style.transform = `translateY(${i * lh + (lh - bh) / 2 + (lh - bh) * 0.3}px)`;
+    el.style.order = i; el.querySelector('.pl').textContent = x.v === null ? '·' : i + 1;
+    const w2 = x.v === null ? 0 : low ? Math.max(6, 100 * (1 - (x.v - Math.min(...vals)) / (liveMax - Math.min(...vals) + 200))) : Math.max(2, 100 * x.v / liveMax);
+    el.querySelector('.fill').style.width = w2 + '%';
+    el.querySelector('.rider').style.left = `calc(${w2}% - ${w2 > 0 ? 6 : -20}px)`;
+    el.querySelector('.v').textContent = x.v === null ? '–' : S.round.kind === 'timing' ? `±${(x.v / 1000).toFixed(2)}초` : x.v + (S.round.unit === 'ms' ? 'ms' : '');
+  });
+  // first-place lane gets the gold place badge
+  race.querySelectorAll('.lane').forEach((el) => { const p = el.querySelector('.pl'), k = +p.textContent - 1; p.className = 'pl medal-b ' + (k >= 0 && k < 3 ? 'm' + k : 'mx'); });
+}
+// ---------- result ----------
+function renderResult() {
+  clearInterval(tick);
+  const h = S.lastResult; if (!h) return renderLobby();
+  const top = h.rows.filter((x) => x.place !== null).slice(0, 3);
+  const order = [top[1], top[0], top[2]].filter(Boolean);
+  const hgt = { 0: 230, 1: 190, 2: 164 }, col = { 0: 'var(--gold)', 1: 'var(--silver)', 2: 'var(--bronze)' }, ah = { 0: 220, 1: 182, 2: 168 };
+  const unit = (x) => x.value === null ? '참여 안 함' : x.value + (h.unit === 'ms' ? 'ms' : h.unit);
+  main.innerHTML = `<section class="screen result">
+    <div class="panel stand"><div class="tabwrap"><span class="banner">${UI.icon(h.id)}${w.result}</span></div>
+      <div class="ttl"><h2 class="display">${esc(h.title)}</h2></div>
+      <div class="podium">${order.map((x) => `<div class="pod">${ava(x, S.pack === 'event' ? [92, 76, 70][x.place] : ah[x.place])}<div class="blk" style="height:${hgt[x.place] ?? 100}px;background:${col[x.place] ?? 'var(--accent)'}">${UI.rosette(x.place, x.place === 0 ? 74 : 60)}<span class="nm">${esc(x.name)}</span><span class="val">${unit(x)} · +${x.points}점</span></div></div>`).join('')}</div>
+    </div>
+    <div class="panel rlist">${h.rows.map((x) => `<div class="row"><div class="pl medal-b ${x.place !== null && x.place < 3 ? 'm' + x.place : 'mx'}">${x.place === null ? '–' : x.place + 1}</div><div class="av">${ava(x, 44)}</div><div class="who">${esc(x.name)}<small>${unit(x)}</small></div><div class="pt">+${x.points}</div><div class="adj"><button data-adj="${x.teamId}" data-d="-1" aria-label="${esc(x.name)} 1점 빼기">−</button><button data-adj="${x.teamId}" data-d="1" aria-label="${esc(x.name)} 1점 더하기">+</button></div></div>`).join('')}
+      <div class="bar"><button class="btn cta" id="next">${w.next}</button><button class="btn" id="undo">이 ${w.round} 취소</button><span class="sp"></span><span class="kbd"><kbd>Space</kbd> 다음 · ± 점수 고치기</span></div>
+    </div></section>`;
+  main.querySelectorAll('[data-adj]').forEach((b) => b.onclick = () => net.send({ t: 'adjust', teamId: b.dataset.adj, d: +b.dataset.d }));
+  $('#next').onclick = () => { selected = null; net.send({ t: 'toLobby' }); };
+  $('#undo').onclick = () => net.send({ t: 'undo' });
+  if (lastPhase !== 'result') { burst(0.35); UI.sfx('reveal'); }
+}
+// ---------- final ----------
+const CROWN = '<svg class="crown" viewBox="0 0 56 44" aria-hidden="true"><path d="M4 14l12 10 12-20 12 20 12-10-5 26H9z" fill="var(--gold)" stroke="rgba(0,0,0,.3)" stroke-width="1.5"/><rect x="9" y="36" width="38" height="5" rx="2" fill="var(--gold)" stroke="rgba(0,0,0,.3)" stroke-width="1.5"/><circle cx="4" cy="13" r="4" fill="var(--gold)"/><circle cx="28" cy="4" r="4" fill="var(--gold)"/><circle cx="52" cy="13" r="4" fill="var(--gold)"/><circle cx="28" cy="27" r="3.4" fill="var(--bad)"/></svg>';
+async function renderFinal() {
+  clearInterval(tick);
+  if (!finalRows || S.revealStep === 0) finalRows = await fetch(`${TG_API}final?r=${S.code}&k=${saved.hostKey}`).then((r) => r.json());
+  const n = finalRows.length, shown = finalRows.slice(n - S.revealStep); // reveal from last place up
+  const done = S.revealStep >= n, ties = finalRows.filter((t) => t.place === 0).length;
+  const card = (t) => done && t.place === 0
+    ? `<div class="rv win ${ties > 1 ? 'tie' : ''}"><div class="ros">${UI.rosette(0, ties > 1 ? 56 : 92)}</div><div class="av">${ava(t, S.pack === 'event' ? (ties > 1 ? 96 : 130) : ties > 1 ? 120 : 170)}${CROWN}</div><div><span class="wrap-banner"><span class="banner">${ties > 1 ? '공동 1등' : '1등'}</span></span><div class="nm">${esc(t.name)}</div><div class="pr">${esc(t.praise)}</div></div><div class="sc">${t.score}점</div></div>`
+    : `<div class="rv"><div class="pl medal-b ${t.place < 3 ? 'm' + t.place : 'mx'}">${t.place + 1}</div><div class="av">${ava(t, S.pack === 'event' ? 52 : 64)}</div><div><div class="nm">${esc(t.name)}</div><div class="pr">${esc(t.praise)}</div></div><div class="sc">${t.score}점</div></div>`;
+  main.innerHTML = `<section class="screen final"><div class="ttl"><span class="wrap-banner"><span class="banner lg">${done ? w.champ : S.revealStep === 0 ? '최종 발표' : `${n - S.revealStep}${w.team === '팀' ? '팀' : '대'} 남았어요`}</span></span>${S.revealStep === 0 ? `<br><p class="hand-note">꼴찌부터 한 ${w.team}씩, 두근두근</p>` : ''}</div>
+    <div class="reveal">${done && ties > 1 ? `<div class="tiebox">${shown.filter((t) => t.place === 0).map(card).join('')}</div>${shown.filter((t) => t.place !== 0).map(card).join('')}` : shown.map(card).join('')}</div>
+    <div class="bar"><button class="btn cta" id="rv" ${done ? 'disabled' : ''}>${S.revealStep === 0 ? '꼴찌부터 공개' : `다음 ${w.team} 공개`}</button><button class="btn" id="back">점수판으로</button><button class="btn primary" id="draw" ${(S.draws || 0) >= S.teams.length ? 'disabled' : ''}>${UI.icon('gift').replace('class="ico"', 'class="ico" style="width:24px;height:24px"')}경품 추첨</button><span class="sp"></span><span class="kbd"><kbd>Space</kbd> 공개</span><button class="btn" id="again">처음부터 다시</button></div></section>`;
+  $('#rv').onclick = () => net.send({ t: 'reveal' });
+  $('#back').onclick = () => { finalRows = null; net.send({ t: 'toLobby' }); };
+  $('#draw').onclick = () => net.send({ t: 'draw' });
+  $('#again').onclick = () => { if (confirmLike('점수를 모두 0으로 돌려요')) { finalRows = null; net.send({ t: 'restart' }); } };
+  if (done) { burst(1); UI.sfx('fanfare'); } else if (S.revealStep > 0) UI.sfx('reveal');
+}
+
+// ---------- prize draw: server picks, the screen spins through the crew and lands on it ----------
+function runDraw() {
+  const d = S.draw, teams = S.teams; if (!teams.length) return;
+  document.querySelector('.drawfx')?.remove(); drawing = true;
+  const el = document.createElement('div'); el.className = 'drawfx'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', '경품 추첨');
+  el.innerHTML = `<div class="dcard panel"><div class="tabwrap"><span class="banner">${UI.icon('gift')}경품 추첨 ${d.n}번째</span></div><div class="slot" id="slot"></div><div class="dname display" id="dname">두구두구…</div><button class="btn" id="dclose">닫기</button></div>`;
+  document.body.appendChild(el); $('#dclose').onclick = closeDraw;
+  const target = teams.findIndex((t) => t.id === d.teamId), steps = teams.length * 3 + ((target + teams.length) % teams.length) + 1;
+  let i = 0;
+  const show = (k) => { const t = teams[k % teams.length]; $('#slot').innerHTML = ava(t, S.pack === 'event' ? 150 : 260); $('#dname').textContent = t.name; };
+  (function spin() {
+    if (!document.body.contains(el)) return;
+    show(i); UI.sfx('tap');
+    if (i >= steps - 1) { el.classList.add('done'); $('#dname').innerHTML = `${esc(d.name)} <small>당첨!</small>`; UI.sfx('fanfare'); burst(0.8); return; }
+    i++; setTimeout(spin, 50 + Math.pow(i / steps, 3) * 420);
+  })();
+}
+function closeDraw() { document.querySelector('.drawfx')?.remove(); drawing = false; }
+
+// ---------- keyboard (Space / arrows / clicker) ----------
+addEventListener('keydown', (e) => {
+  if (!S || e.target.tagName === 'INPUT') return;
+  if (drawing && (e.key === ' ' || e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); return closeDraw(); }
+  if (e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+    e.preventDefault();
+    if (S.phase === 'lobby' && S.teams.length) net.send({ t: 'start', round: selected });
+    else if (S.phase === 'result') { selected = null; net.send({ t: 'toLobby' }); }
+    else if (S.phase === 'final') net.send({ t: 'reveal' });
+  } else if (S.phase === 'lobby' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const ids = [...main.querySelectorAll('.rcard')].map((b) => b.dataset.r);
+    const i = ids.indexOf(selected); selected = ids[(i + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length]; renderLobby();
+  }
+});
+
+// ---------- confetti ----------
+function burst(power) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = $('#fx'), g = c.getContext('2d'); c.width = innerWidth * devicePixelRatio; c.height = innerHeight * devicePixelRatio; g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const cs = getComputedStyle(document.documentElement), cols = ['--accent', '--accent-2', '--gold', '--good'].map((v) => cs.getPropertyValue(v).trim());
+  const P = Array.from({ length: Math.round(180 * power) }, () => ({ x: innerWidth / 2 + (Math.random() - .5) * 260, y: innerHeight * .5, vx: (Math.random() - .5) * 17, vy: -8 - Math.random() * 12, r: 4 + Math.random() * 5, c: cols[Math.floor(Math.random() * cols.length)], a: Math.random() * 6, s: (Math.random() - .5) * .3 }));
+  let f = 0; (function step() { g.clearRect(0, 0, innerWidth, innerHeight); P.forEach((p) => { p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.s; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; g.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); g.restore(); }); if (++f < 170) requestAnimationFrame(step); else g.clearRect(0, 0, innerWidth, innerHeight); })();
+}
+addEventListener('resize', () => { if (S && S.phase === 'play') paintRace(); });
+</script>
+</body>
+</html>

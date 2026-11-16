@@ -104,3 +104,12 @@ This is deployment evidence only. Authenticated canonical retrieval, 30-day sess
 `CONTINUE` currently records a trace and acknowledgement; it does not execute the next work item. REVIEW is local routing; CHAT has no AI provider connected. Command recognition is not task completion.
 Current user-approved scope is documentation correction only. Mobile AI Gateway and external write adapters are deferred pending renewed need/cost/authority approval; existing project rules are not deleted.
 This documentation-only change uses `[skip netlify]` and does not request deployment. Runtime code/configuration are unchanged. Rollback source is the baseline commit above; review later changes before restoration.
+
+## TAKY 팀게임 (`/team-game/`)
+- 큰 화면 진행(`/team-game/`) + 팀마다 폰 한 대(`/team-game/play.html?r=CODE`). 학습 팩 19 / 행사 팩 17, 서로 다른 게임 25종, 경품 추첨.
+- 실시간 층: WebSocket 대신 짧은 폴링 + Netlify Function `teamgame` (`/team-game/api/*`) + Netlify Blobs store `taky-teamgame`.
+  방 문서는 ETag 비교 저장(compare-and-swap)이라 여러 폰이 동시에 요청해도 라운드는 한 번만 채점된다. 팀 입력은 팀별 키에 따로 쌓인다.
+- 라운드 전환(카운트다운 → 진행 → 결과)은 타이머 없이 요청이 올 때 시계로 판단한다.
+- 엔진 원본: TAKY Web 프로젝트 TWEB-20261111-0010 (`netlify/functions/teamgame/engine.mjs`, `api.mjs`, `rounds.cjs`).
+- 테스트: `node tests/teamgame-engine.test.mjs` (동시 합류·동시 종료·입력 제한), `node tools/test-teamgame-blobs.mjs` (Blobs 조건부 쓰기).
+- 서비스워커는 `/team-game/`를 가로채지 않는다.

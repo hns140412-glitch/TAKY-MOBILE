@@ -1,0 +1,51 @@
+{
+ "source_repo": "hns140412-glitch/Ready-Set@rebuild/approved-design-20261105",
+ "status": "derived copies; Ready-Set marks scenes GENERATED_CANDIDATE_PENDING_TAKY_REVIEW; not yet in TAKY-ASSETS",
+ "files": [
+  {
+   "out": "scenes/camp.webp",
+   "src": "rs/rs/scenes/camp.webp",
+   "sha256": "ed70ddde030a23cda43a94ed077a4e0e02c38622021cac7ac898f557c3a10c86"
+  },
+  {
+   "out": "scenes/base.webp",
+   "src": "rs/rs/scenes/base.webp",
+   "sha256": "43b34a0d294e0558ebbaa71d793e210ceab2b29b17c4f6ccb88f20c98db1ff3a"
+  },
+  {
+   "out": "scenes/island.webp",
+   "src": "rs/rs/scenes/island.webp",
+   "sha256": "d0226c273ac17c9ce6b4f19e4556dfb385cb2f2c66fe4cccabef3817dc9c3407"
+  },
+  {
+   "out": "scenes/camp-wide.webp",
+   "src": "rs/rs/scenes/camp.webp",
+   "note": "landscape band y=30%..+466 upscaled 1.93x for big screen"
+  },
+  {
+   "out": "items/compass.webp",
+   "src": "rs/rs/items/compass.webp",
+   "sha256": "6451475f6a1c14df83a047bc01bebc203d38d7ca525b0c414d86a10df9fd802b"
+  },
+  {
+   "out": "items/binoculars.webp",
+   "src": "rs/rs/items/binoculars.webp",
+   "sha256": "ee540453793508770ae486a70377968e1131fb1c144f8432f37ff4196970d7dc"
+  },
+  {
+   "out": "items/camera.webp",
+   "src": "rs/rs/items/camera.webp",
+   "sha256": "0538147e7f12e5fe8ffa2bcc198708c69f6fb07d3b984f3c96cc97f867963ffa"
+  },
+  {
+   "out": "items/bottle.webp",
+   "src": "rs/rs/items/bottle.webp",
+   "sha256": "4dc305162275b3f25f78b03c7292afa338e33d38b7b192f21b3ac0f7e10033aa"
+  },
+  {
+   "out": "items/notebook.webp",
+   "src": "rs/rs/items/notebook.webp",
+   "sha256": "8a376537eceecd1f9a194d30c3535e3fddde3ff9ae242b01567af0b4d550d693"
+  }
+ ]
+}

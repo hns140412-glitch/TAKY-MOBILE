@@ -35,6 +35,9 @@ const LOCAL_SPECIALIST_TARGETS={
   playCamp:optionalLocalTarget('play_camp_target'),
 };
 
+// Same-origin team game (served from this site's /team-game/ + teamgame function).
+const TEAM_GAME_URL=(typeof location!=='undefined'&&/^https?:$/.test(location.protocol)?location.origin:'https://taky-mobile.netlify.app')+'/team-game/';
+
 const APPS = [
   {
     id:'ready-set',
@@ -85,6 +88,16 @@ const APPS = [
     netlifySite:'savey-taky',
     status:'ACCESS_RESTRICTED',
     note:'가족 전용 가계부 · Netlify 로그인 필요 · 가족 금융 인증 연결 검증 중',
+  },
+  {
+    id:'team-game',
+    name:'TAKY 팀게임',
+    short:'TG',
+    aliases:['팀게임','팀 게임','타키 팀게임','team game','teamgame'],
+    url:TEAM_GAME_URL,
+    netlifySite:'taky-mobile',
+    status:'LINKED',
+    note:'큰 화면 진행 + 팀마다 폰 한 대 · 학습 팩 / 행사 팩 25종',
   },
 ];
 

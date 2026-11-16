@@ -1,4 +1,4 @@
-const CACHE='taky-mobile-mvp-v9-release-status';
+const CACHE='taky-mobile-mvp-v10-team-game';
 const ASSETS=[
   './',
   './index.html',
@@ -31,6 +31,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/.netlify/functions/')) return;
+  // TAKY 팀게임 is its own live app under /team-game/: never cache or answer it from here.
+  if (url.pathname === '/team-game' || url.pathname.startsWith('/team-game/')) return;
   if (event.request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
