@@ -21,6 +21,16 @@ test('device cookie never authorizes admin',async()=>{
 });
 test('admin cookie gates progress and whitelists fields',async()=>{
  const fixture={schema:'TAKY_MOBILE_ADMIN_PROGRESS_SNAPSHOT_V1',generatedAt:'2026-10-18T14:00Z',counts:{projects:9,work:7,blocked:2,review:3,open:2,verified:0},coverage:{historicalChats:25,octoberNativeChats:0},projects:[{id:'TAKY',registered:'IDLE',current:'IDLE',signal:'BLOCKED_TASK_RECORDED',workCount:7,historicalChats:36,relayCandidates:19,latestCodeAt:'2026-10-17T07:00Z',privatePath:'D:\\secret'}],work:[{id:'TAKY-CHAT-'+'a'.repeat(32),title:'검토',project:'TAKY',status:'REVIEW',executor:'Claude',reviewer:'UNASSIGNED',receiptCount:1,outputCount:1,lastReceipt:'PASS',verified:false,preparedCount:1,callClaimCount:1,unclassifiedReceiptCount:0,chatLinked:false,lastObserved:'2026-10-18T14:00Z',evidenceState:'DERIVED_RECORD_NOT_INDEPENDENT_EXECUTION_PROOF',rawMessage:'private raw'}],alerts:[{kind:'REVIEW',project:'TAKY',note:'근거 부족',password:'private'}],pipeline:{notionTotal:220,notionTextStaged:158,notionTextHolds:62,mediaVerifiedReferences:804,mediaMissingReferences:173,gptFrozen:false,claudeFrozen:false,crossFrozen:false,codexFrozen:false,userApprovalRequiredForModel:true,privateRawFile:'secret'}};
+ fixture.counts.aiJobsSignedTransportOnly=5;
+ fixture.counts.aiJobsSignedExecutionEvidence=0;
+ fixture.counts.aiJobsIndependentlyComplete=0;
+ fixture.counts.aiJobsSignedHandoffState='EXACT_SIGNED_HANDOFFS_RECONCILED_NOT_COMPLETION';
+ fixture.pipeline.siteWatchRawProvenanceSources=64;
+ fixture.pipeline.siteWatchCodexEvidenceCandidates=16;
+ fixture.pipeline.siteWatchFormalBilateralComplete=0;
+ fixture.pipeline.siteWatchFinalOwnerApproval=0;
+ fixture.pipeline.siteWatchGateState='SITE_RAW_AND_CODEX_CANDIDATES_NOT_FORMALLY_APPROVED';
+ fixture.pipeline.siteWatchPrivateRaw='D:/PRIVATE_CAPTURE_DO_NOT_SEND';
  fixture.lineage={authority:'DERIVED_VIEW_ONLY_NOT_GLOBAL_CURRENT',nativeChatCount:0,topicCount:0,
    projectCurrentProjectionHashMatches:1,projectCount:9,exactWorkKernelLinks:0,secretPath:'D:/hidden-project'};
  fixture.kernel={source:'TAKY2_RUNTIME_READ_ONLY_NON_CANONICAL',integrity:'HMAC_AND_ROLLBACK_ANCHOR_VERIFIED',observedFileModifiedAt:'2026-10-19T00:00:00Z',
@@ -87,6 +97,10 @@ test('admin cookie gates progress and whitelists fields',async()=>{
       secondaryUnresolved:i+3,tertiaryUnresolved:i===5?7:null,
       private:'F:/PRIVATE_GATE_SECRET',nextCode:'PRIVATE_SECRET_COMMAND'
     }))};
+ fixture.operator.reason_executor={
+    state:'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE',
+    claude_live:false,codex_live:false,bilateral_live:false,cli_shell_sessions:6,
+    privatePath:'D:/PRIVATE_REASON_NETWORK_DO_NOT_SEND',model_started:true};
  process.env.TAKY_ADMIN_PROGRESS_JSON=JSON.stringify(fixture);
  const signin=await login(request('admin-session','POST',{o:origin,body:{key:process.env.TAKY_ADMIN_ACCESS_KEY}}));
  assert.equal(signin.status,200);
@@ -111,6 +125,16 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(txt.includes('PRIVATE_GATE_SECRET'),false);
  assert.equal(txt.includes('PRIVATE_SECRET_COMMAND'),false);
  assert.equal(data.counts.projects,9);assert.equal(data.work[0].verified,false);
+ assert.equal(data.counts.aiJobsSignedTransportOnly,5);
+ assert.equal(data.counts.aiJobsSignedExecutionEvidence,0);
+ assert.equal(data.counts.aiJobsIndependentlyComplete,0);
+ assert.equal(data.counts.aiJobsSignedHandoffState,'EXACT_SIGNED_HANDOFFS_RECONCILED_NOT_COMPLETION');
+ assert.equal(data.pipeline.siteWatchRawProvenanceSources,64);
+ assert.equal(data.pipeline.siteWatchCodexEvidenceCandidates,16);
+ assert.equal(data.pipeline.siteWatchFormalBilateralComplete,0);
+ assert.equal(data.pipeline.siteWatchFinalOwnerApproval,0);
+ assert.equal(data.pipeline.siteWatchGateState,'SITE_RAW_AND_CODEX_CANDIDATES_NOT_FORMALLY_APPROVED');
+ assert.equal(txt.includes('PRIVATE_CAPTURE_DO_NOT_SEND'),false);
  assert.equal(data.work[0].preparedCount,1);assert.equal(data.work[0].callClaimCount,1);
  assert.equal(data.work[0].classificationAvailable,true);assert.equal(data.work[0].chatLinked,false);
  assert.equal(data.work[0].kernelExact.relation,'NO_EXACT_TASK_ID_MATCH');
@@ -143,6 +167,13 @@ test('admin cookie gates progress and whitelists fields',async()=>{
  assert.equal(data.counts.runtimeAssetsChecked,289);
  assert.equal(data.counts.runtimeAssetsMissing,0);
  assert.equal(data.counts.runtimeAssetsUnversioned,66);
+ assert.equal(data.operator.reasonExecutor.state,'HOLD_LIVE_EXECUTOR_SESSIONS_NOT_VISIBLE');
+ assert.equal(data.operator.reasonExecutor.claudeLive,false);
+ assert.equal(data.operator.reasonExecutor.codexLive,false);
+ assert.equal(data.operator.reasonExecutor.bilateralLive,false);
+ assert.equal(data.operator.reasonExecutor.cliShellSessions,6);
+ assert.equal(data.operator.reasonExecutor.modelStarted,false);
+ assert.equal(txt.includes('PRIVATE_REASON_NETWORK_DO_NOT_SEND'),false);
  assert.equal(data.operator.localExecution.dependencyWait,11);
  assert.equal(data.operator.localExecution.recentActions,0);
  assert.equal(data.operator.localExecution.completionVerified,false);
