@@ -1,0 +1,247 @@
+{
+  "note": "Derived deployment copies of Taky-supplied Explorer Crew originals (2026-11-08). Canonical originals belong in TAKY-ASSETS (TKY-ASSET-001); not yet registered there.",
+  "items": [
+    {
+      "id": "01",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/01.png",
+      "source_sha256": "6697d198d12d9e50",
+      "derived": "public/art/crew/01.webp",
+      "size": [
+        317,
+        440
+      ]
+    },
+    {
+      "id": "02",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/02.png",
+      "source_sha256": "5acf94ee58e87bdd",
+      "derived": "public/art/crew/02.webp",
+      "size": [
+        268,
+        440
+      ]
+    },
+    {
+      "id": "03",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/03.png",
+      "source_sha256": "549d46b4be2ca593",
+      "derived": "public/art/crew/03.webp",
+      "size": [
+        292,
+        440
+      ]
+    },
+    {
+      "id": "04",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/04.png",
+      "source_sha256": "2952a0b4ba0f1bba",
+      "derived": "public/art/crew/04.webp",
+      "size": [
+        330,
+        440
+      ]
+    },
+    {
+      "id": "05",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/05.png",
+      "source_sha256": "6d4e0847edda7525",
+      "derived": "public/art/crew/05.webp",
+      "size": [
+        309,
+        440
+      ]
+    },
+    {
+      "id": "06",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/06.png",
+      "source_sha256": "70499bb6b6db5b9d",
+      "derived": "public/art/crew/06.webp",
+      "size": [
+        283,
+        440
+      ]
+    },
+    {
+      "id": "07",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/07.png",
+      "source_sha256": "c5cfe8add0869c61",
+      "derived": "public/art/crew/07.webp",
+      "size": [
+        327,
+        440
+      ]
+    },
+    {
+      "id": "08",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/08.png",
+      "source_sha256": "52d9452977c60577",
+      "derived": "public/art/crew/08.webp",
+      "size": [
+        334,
+        440
+      ]
+    },
+    {
+      "id": "09",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/09.png",
+      "source_sha256": "da61cab9f1b7fb73",
+      "derived": "public/art/crew/09.webp",
+      "size": [
+        230,
+        440
+      ]
+    },
+    {
+      "id": "10",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/10.png",
+      "source_sha256": "dca0448a7c3f9faf",
+      "derived": "public/art/crew/10.webp",
+      "size": [
+        337,
+        440
+      ]
+    },
+    {
+      "id": "11",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/11.png",
+      "source_sha256": "94806fee08e31bd7",
+      "derived": "public/art/crew/11.webp",
+      "size": [
+        255,
+        440
+      ]
+    },
+    {
+      "id": "12",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/12.png",
+      "source_sha256": "cf947f6cce8f1f12",
+      "derived": "public/art/crew/12.webp",
+      "size": [
+        269,
+        440
+      ]
+    },
+    {
+      "id": "13",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/13.png",
+      "source_sha256": "9026f7615e71a3fe",
+      "derived": "public/art/crew/13.webp",
+      "size": [
+        331,
+        440
+      ]
+    },
+    {
+      "id": "14",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/14.png",
+      "source_sha256": "4bdfc8d1da752082",
+      "derived": "public/art/crew/14.webp",
+      "size": [
+        312,
+        440
+      ]
+    },
+    {
+      "id": "15",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/15.png",
+      "source_sha256": "f6676204b7246cf2",
+      "derived": "public/art/crew/15.webp",
+      "size": [
+        284,
+        440
+      ]
+    },
+    {
+      "id": "16",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/16.png",
+      "source_sha256": "72981ed644b19f0b",
+      "derived": "public/art/crew/16.webp",
+      "size": [
+        324,
+        440
+      ]
+    },
+    {
+      "id": "17",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/17.png",
+      "source_sha256": "eb1fafa710953d8d",
+      "derived": "public/art/crew/17.webp",
+      "size": [
+        307,
+        440
+      ]
+    },
+    {
+      "id": "18",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/18.png",
+      "source_sha256": "638b30742b5f5184",
+      "derived": "public/art/crew/18.webp",
+      "size": [
+        297,
+        440
+      ]
+    },
+    {
+      "id": "19",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/19.png",
+      "source_sha256": "01549fe7b457adde",
+      "derived": "public/art/crew/19.webp",
+      "size": [
+        481,
+        440
+      ]
+    },
+    {
+      "id": "20",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/20.png",
+      "source_sha256": "229d1884993d651c",
+      "derived": "public/art/crew/20.webp",
+      "size": [
+        253,
+        440
+      ]
+    },
+    {
+      "id": "21",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/21.png",
+      "source_sha256": "7616beade62cd9db",
+      "derived": "public/art/crew/21.webp",
+      "size": [
+        191,
+        440
+      ]
+    },
+    {
+      "id": "22",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/22.png",
+      "source_sha256": "c4370543af795747",
+      "derived": "public/art/crew/22.webp",
+      "size": [
+        221,
+        440
+      ]
+    },
+    {
+      "id": "23",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/23.png",
+      "source_sha256": "f7816a995cc28fea",
+      "derived": "public/art/crew/23.webp",
+      "size": [
+        188,
+        440
+      ]
+    },
+    {
+      "id": "24",
+      "source": "project-files/ready-set-rebuild/crew-natural-20261108/24.png",
+      "source_sha256": "26311be9cc57e90c",
+      "derived": "public/art/crew/24.webp",
+      "size": [
+        267,
+        440
+      ]
+    }
+  ],
+  "derivative": {},
+  "note_20261112": "Re-derived at 640px height (was 440) so 2x screens are not upscaled; alpha-bbox crop + 2% transparent pad, LANCZOS, webp q84."
+}

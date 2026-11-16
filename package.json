@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@netlify/blobs": "^10.0.0",
-    "google-auth-library": "^9.15.1"
+    "google-auth-library": "^9.15.1",
+    "qrcode": "^1.5.4"
   }
 }

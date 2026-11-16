@@ -104,3 +104,14 @@ This is deployment evidence only. Authenticated canonical retrieval, 30-day sess
 `CONTINUE` currently records a trace and acknowledgement; it does not execute the next work item. REVIEW is local routing; CHAT has no AI provider connected. Command recognition is not task completion.
 Current user-approved scope is documentation correction only. Mobile AI Gateway and external write adapters are deferred pending renewed need/cost/authority approval; existing project rules are not deleted.
 This documentation-only change uses `[skip netlify]` and does not request deployment. Runtime code/configuration are unchanged. Rollback source is the baseline commit above; review later changes before restoration.
+
+## TAKY 팀게임 (`/team-game/`)
+- 큰 화면 진행(`/team-game/`) + 팀마다 폰 한 대(`/team-game/play.html?r=CODE`). 학습 팩 19 / 행사 팩 17, 서로 다른 게임 25종, 경품 추첨.
+- 실시간 층: WebSocket 대신 짧은 폴링 + Netlify Function `teamgame` (`/team-game/api/*`) + Netlify Blobs store `taky-teamgame`.
+  키 하나에 작성자 하나: 방 문서는 진행 화면만 쓰고(요청을 한 번에 하나씩), 팀 입력·접속 표시는 그 팀 폰만 쓴다. 합류는 폰이 join 키를 남기면 진행 화면이 받아 넣는다.
+  (실측 2026-11-16: Netlify Blobs의 조건부 쓰기는 동시 요청에서 지켜지지 않아 쓰지 않는다.)
+- TV: 진행 화면의 "TV로 보내기" 버튼(Presentation API, 크롬) → 크롬캐스트/구글TV에 읽기 전용 진행 화면. TV에서는 25% 크게.
+- 라운드 전환(카운트다운 → 진행 → 결과)은 타이머 없이 요청이 올 때 시계로 판단한다.
+- 엔진 원본: TAKY Web 프로젝트 TWEB-20261111-0010 (`netlify/functions/teamgame/engine.mjs`, `api.mjs`, `rounds.cjs`).
+- 테스트: `node tests/teamgame-engine.test.mjs` (동시 합류·동시 종료·입력 제한), `node tools/test-teamgame-blobs.mjs` (로컬 Blobs 서버로 저장·목록·합류).
+- 서비스워커는 `/team-game/`를 가로채지 않는다.
