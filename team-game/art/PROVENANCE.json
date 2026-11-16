@@ -243,5 +243,13 @@
     }
   ],
   "derivative": {},
-  "note_20261112": "Re-derived at 640px height (was 440) so 2x screens are not upscaled; alpha-bbox crop + 2% transparent pad, LANCZOS, webp q84."
+  "note_20261112": "Re-derived at 640px height (was 440) so 2x screens are not upscaled; alpha-bbox crop + 2% transparent pad, LANCZOS, webp q84.",
+  "bgm": {
+    "date": "2026-11-16",
+    "file": "public/bgm.js",
+    "what": "Background music loops for the host/TV screen: family pack (C major adventure) and company pack (A minor show), one loop per scene (lobby, intro, play, result, final).",
+    "origin": "Original composition written for TAKY 팀게임 by Claude in this project; synthesized live with the Web Audio API. No samples, recordings, or third-party melodies.",
+    "license": "TAKY original. Free to use, modify and play commercially (no attribution needed). No outside music, no paid music, no generation API used.",
+    "why_not_downloaded_cc0": "Cloud session could not reach music archives; an original avoids per-track license checks. A verified CC0 track can replace any scene later."
+  }
 }

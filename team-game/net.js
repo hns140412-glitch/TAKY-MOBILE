@@ -19,6 +19,7 @@ window.Net = function Net(onOpen, onMsg, onStatus) {
       if (m.t === 'host') auth = { code: m.code, hostKey: m.hostKey, ...(window.TG_VIEW_ONLY ? { view: true } : {}) };
       else if (m.t === 'rejoin') auth = { code: m.code, teamId: m.teamId, token: m.token };
       else if (m.t === 'join') auth = { code: m.code };
+      else if (m.t === 'peek' && !auth) auth = { code: m.code };
       if (!auth) return;
       const tail = queue[queue.length - 1];
       if (m.t === 'count' && tail && tail.t === 'count') { tail.n = Math.min(60, tail.n + m.n); return; }
