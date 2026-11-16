@@ -37,6 +37,21 @@ assert.ok(hs.teams.every((x) => x.online), 'joined teams show online');
 assert.ok(!('token' in hs.teams[0]), 'tokens never leak to host');
 assert.equal((await kv.list(`join/${code}/`)).length, 0, 'join requests cleaned up');
 
+// crew picking: peek shows taken crews; a pick is honoured, a taken pick is refused before waiting
+{
+  const peek = (await send(kv, { code }, { t: 'peek', code }, t))[0];
+  assert.equal(peek.t, 'room'); assert.equal(peek.pack, 'learn'); assert.equal(peek.taken.length, 12);
+  const free = Array.from({ length: 24 }, (_, i) => i + 1).find((n) => !peek.taken.includes(n));
+  const takenOne = peek.taken[0];
+  assert.equal((await send(kv, { code }, { t: 'join', code, name: '고른팀X', crew: takenOne }, t))[0].code, 'CREW');
+  let on = true; const loop = (async () => { while (on) { await poll(kv, host, t + 100); await sleep(40); } })();
+  const [a2, b2] = await Promise.all([send(kv, { code }, { t: 'join', code, name: '고른팀A', crew: free }, t), send(kv, { code }, { t: 'join', code, name: '고른팀B', crew: free }, t)]);
+  on = false; await loop;
+  const crews = [a2[1].team.crew, b2[1].team.crew];
+  assert.ok(crews.includes(free), 'one team got the picked crew'); assert.notEqual(crews[0], crews[1], 'the other got a different free crew');
+  await send(kv, host, { t: 'kick', teamId: a2[0].teamId }, t); await send(kv, host, { t: 'kick', teamId: b2[0].teamId }, t);
+}
+
 // start a count round
 hs = (await send(kv, host, { t: 'start', round: 'tap' }, t))[0];
 assert.equal(hs.phase, 'intro');
@@ -76,13 +91,39 @@ assert.equal((await poll(kv, { code, teamId: auth[0].teamId, token: 'x' }, t))[0
 await send(kv, host, { t: 'kick', teamId: auth[0].teamId }, t);
 assert.equal((await poll(kv, auth[0], t))[0].t, 'kicked');
 
-// final + draw: 12 draws give 11 distinct teams then stop
+// family pack: all 12 teams played the tap round -> everyone got the 'together' bonus
+assert.equal(hs.lastResult.together, true, 'family pack: all-together bonus');
+assert.ok(hs.lastResult.rows.every((x) => x.bonus === 2), 'bonus on every row');
+assert.equal(hs.lastResult.rows[0].points, 6 + 2, 'family ranks are gentle (6 for 1st) + bonus');
+// family final: no prize draw, the whole expedition is revealed at once
 await send(kv, host, { t: 'final' }, t);
-const drawn = [];
-for (let i = 0; i < 12; i++) { const s = (await send(kv, host, { t: 'draw' }, t + i))[0]; if (s.draw && !drawn.includes(s.draw.teamId)) drawn.push(s.draw.teamId); }
-assert.equal(drawn.length, 11);
+assert.equal((await send(kv, host, { t: 'draw' }, t))[0].draw, null, 'no prize draw in the family pack');
+assert.equal((await send(kv, host, { t: 'reveal' }, t))[0].revealStep, 11, 'family reveal is all at once');
 const rows = await final(kv, code, hostKey, t);
 assert.equal(rows.length, 11); assert.ok(rows.every((r) => r.praise));
+
+// company pack: own mission names, steep ranks, last-place-first reveal, prize draw
+{
+  const ev = await createRoom(kv, 'event', t), eh = { code: ev.code, hostKey: ev.hostKey };
+  let on = true; const loop = (async () => { while (on) { await poll(kv, eh, t + 100); await sleep(40); } })();
+  const ej = await Promise.all(['가', '나', '다'].map((name) => send(kv, { code: ev.code }, { t: 'join', code: ev.code, name }, t)));
+  on = false; await loop;
+  let es = (await poll(kv, eh, t))[0];
+  assert.ok(es.rounds.some((r) => r.title === '스피드 탭 배틀'), 'company pack renames the tap mission');
+  assert.ok(!es.rounds.some((r) => r.id === 'clock'), 'school missions stay in the family pack');
+  assert.ok(es.rounds.some((r) => r.id === 'abbr'), 'company-only missions present');
+  await send(kv, eh, { t: 'start', round: 'tap' }, t);
+  const ea = ej.map((m) => ({ code: ev.code, teamId: m[0].teamId, token: m[0].token }));
+  await Promise.all(ea.map((a, i) => send(kv, a, { t: 'count', n: i + 1 }, t + INTRO_MS + 2000)));
+  es = (await poll(kv, eh, t + INTRO_MS + 20_000))[0]; es = (await poll(kv, eh, t + INTRO_MS + 20_100))[0];
+  assert.equal(es.phase, 'result'); assert.equal(es.lastResult.together, false);
+  assert.deepEqual(es.lastResult.rows.map((x) => x.points), [10, 8, 6], 'company ranks are steep, no bonus');
+  await send(kv, eh, { t: 'final' }, t);
+  assert.equal((await send(kv, eh, { t: 'reveal' }, t))[0].revealStep, 1, 'company reveal one by one');
+  const drawn = [];
+  for (let i = 0; i < 4; i++) { const s = (await send(kv, eh, { t: 'draw' }, t + i))[0]; if (s.draw && !drawn.includes(s.draw.teamId)) drawn.push(s.draw.teamId); }
+  assert.equal(drawn.length, 3, 'prize draw picks each team once');
+}
 
 // quiz: wrong answer locks for 1.2s
 await send(kv, host, { t: 'toLobby' }, t);

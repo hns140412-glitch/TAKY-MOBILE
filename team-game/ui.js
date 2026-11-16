@@ -29,10 +29,34 @@
     nonsense: S('<path d="M17 31a12 12 0 1 1 14 0v5H17z" fill="var(--panel-solid)"/><path d="M18 41h12M20 45h8"/><path d="M21 22l3 4 3-4" stroke="var(--accent-2)"/>'),
     capital: S('<circle cx="24" cy="24" r="17" fill="var(--panel-solid)"/><path d="M7 24h34M24 7c6 6 6 28 0 34M24 7c-6 6-6 28 0 34" stroke-width="1.8"/><circle cx="31" cy="17" r="4" fill="var(--bad)" stroke="var(--bad)"/>'),
     trivia: S('<path d="M8 8h32a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H22l-9 7v-7H8a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="var(--panel-solid)"/><path d="M20 16a4 4 0 1 1 5 4c-1 .8-1 2-1 3M24 28v.1" stroke="var(--accent-2)"/>'),
+    gugu: S('<rect x="6" y="6" width="36" height="36" rx="8" fill="var(--panel-solid)"/><path d="M15 15l10 10M25 15L15 25"/><path d="M28 31h10M28 36h10" stroke="var(--accent-2)"/>'),
+    clock: S('<circle cx="24" cy="24" r="18" fill="var(--panel-solid)"/><path d="M24 12v12l8 5"/><path d="M24 24l-6-8" stroke="var(--accent-2)"/><circle cx="24" cy="24" r="2" fill="currentColor"/>'),
+    money: S('<circle cx="18" cy="26" r="12" fill="var(--gold)" stroke="var(--gold)"/><circle cx="30" cy="20" r="12" fill="var(--panel-solid)"/><path d="M26 16l4 8 4-8M26 21h8"/>'),
+    sum10: S('<rect x="5" y="12" width="16" height="24" rx="5" fill="var(--panel-solid)"/><rect x="27" y="12" width="16" height="24" rx="5" fill="var(--accent-2)" stroke="var(--accent-2)"/><path d="M13 20v8M9 24h8"/><path d="M31 21h8M31 27h8" stroke="var(--panel-solid)"/>'),
+    stars: S('<path d="M17 6l3.5 7 7.5 1-5.5 5 1.5 7.5L17 23l-7 3.5L11.5 19 6 14l7.5-1z" fill="var(--gold)" stroke="var(--gold)"/><path d="M33 22l2.5 5 5.5.8-4 3.8 1 5.4-5-2.6-5 2.6 1-5.4-4-3.8 5.5-.8z" fill="var(--panel-solid)"/>'),
+    engsent: S('<rect x="4" y="12" width="40" height="24" rx="6" fill="var(--panel-solid)"/><path d="M10 24h6M32 24h6"/><path d="M19 28h10" stroke="var(--accent-2)" stroke-width="3"/>'),
+    engopp: S('<path d="M8 18h26l-6-6M40 30H14l6 6"/><path d="M40 30H14l6 6" stroke="var(--accent-2)"/>'),
+    hanjaword: S('<rect x="4" y="12" width="17" height="24" rx="4" fill="var(--panel-solid)"/><rect x="27" y="12" width="17" height="24" rx="4" fill="var(--panel-solid)"/><path d="M12.5 17v14M8 23h9M35.5 17v14M31 21h9M31 27h9"/><path d="M22 24h4" stroke="var(--accent-2)" stroke-width="3"/>'),
+    mimic: S('<path d="M8 20v8h7l9 8V12l-9 8z" fill="var(--panel-solid)"/><path d="M30 18c3 3 3 9 0 12M35 13c6 6 6 16 0 22" stroke="var(--accent-2)"/>'),
+    groupname: S('<rect x="5" y="9" width="38" height="30" rx="8" fill="var(--panel-solid)" stroke-dasharray="4 4"/><circle cx="15" cy="24" r="4"/><circle cx="24" cy="24" r="4" fill="var(--accent-2)" stroke="var(--accent-2)"/><circle cx="33" cy="24" r="4"/>'),
+    job: S('<circle cx="24" cy="17" r="8" fill="var(--panel-solid)"/><path d="M10 42c0-8 6-13 14-13s14 5 14 13"/><path d="M15 12h18l-3-5H18z" fill="var(--accent-2)" stroke="var(--accent-2)"/>'),
+    riddle: S('<path d="M10 8h28a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H24l-8 7v-7h-6a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="var(--panel-solid)"/><path d="M20 16a4 4 0 1 1 5 4c-1 .8-1 2-1 3M24 28v.1" stroke="var(--accent-2)"/>'),
+    scramble: S('<rect x="4" y="16" width="12" height="14" rx="3" fill="var(--panel-solid)" transform="rotate(-10 10 23)"/><rect x="18" y="14" width="12" height="14" rx="3" fill="var(--accent-2)" stroke="var(--accent-2)" transform="rotate(8 24 21)"/><rect x="32" y="18" width="12" height="14" rx="3" fill="var(--panel-solid)" transform="rotate(-6 38 25)"/>'),
+    mixarrow: S('<path d="M8 16h22m0 0l-6-6m6 6l-6 6"/><path d="M40 32H18m0 0l6-6m-6 6l6 6" stroke="var(--bad)"/>'),
+    animalox: S('<circle cx="24" cy="28" r="12" fill="var(--panel-solid)"/><circle cx="13" cy="13" r="5" fill="var(--panel-solid)"/><circle cx="35" cy="13" r="5" fill="var(--panel-solid)"/><circle cx="20" cy="27" r="1.5" fill="currentColor"/><circle cx="28" cy="27" r="1.5" fill="currentColor"/><path d="M21 33c2 2 4 2 6 0" stroke="var(--accent-2)"/>'),
+    food: S('<path d="M6 26h36c0 9-8 15-18 15S6 35 6 26z" fill="var(--panel-solid)"/><path d="M16 20c0-4 3-4 3-8M24 20c0-4 3-4 3-8M32 20c0-4 3-4 3-8" stroke="var(--accent-2)"/>'),
+    idiom: S('<rect x="5" y="5" width="17" height="17" rx="3" fill="var(--panel-solid)"/><rect x="26" y="5" width="17" height="17" rx="3" fill="var(--panel-solid)"/><rect x="5" y="26" width="17" height="17" rx="3" stroke-dasharray="3 3"/><rect x="26" y="26" width="17" height="17" rx="3" stroke-dasharray="3 3" stroke="var(--accent-2)"/>'),
+    abbr: S('<rect x="6" y="8" width="36" height="32" rx="5" fill="var(--panel-solid)"/><path d="M6 16h36"/><path d="M12 26l3-6 3 6M13 24.5h4M22 20v6h4M30 20h5v6h-5" stroke="var(--accent-2)" stroke-width="2.2"/>'),
     gift: S('<rect x="7" y="20" width="34" height="22" rx="3" fill="var(--panel-solid)"/><rect x="5" y="13" width="38" height="8" rx="2" fill="var(--gold)" stroke="var(--gold)"/><path d="M24 13v29" stroke="var(--bad)" stroke-width="3"/><path d="M24 13c-4-8-14-6-10 0M24 13c4-8 14-6 10 0"/>'),
     flag: S('<path d="M12 43V6"/><path d="M12 7h24l-6 7 6 7H12" fill="var(--gold)" stroke="var(--gold)"/>'),
   };
   function icon(id) { return ICONS[id] || ICONS.compass; }
+  // Analog clock face for the clock-reading mission.
+  function clockFace(h, m, size = 180) {
+    const a = (deg, len) => { const r = (deg - 90) * Math.PI / 180; return `${(50 + Math.cos(r) * len).toFixed(1)} ${(50 + Math.sin(r) * len).toFixed(1)}`; };
+    const ticks = Array.from({ length: 12 }, (_, i) => `<path d="M${a(i * 30, 40)}L${a(i * 30, i % 3 ? 36 : 33)}" stroke="#1E2B4A" stroke-width="${i % 3 ? 1.6 : 3}"/><text x="${a(i * 30, 27).split(' ')[0]}" y="${+a(i * 30, 27).split(' ')[1] + 4}" text-anchor="middle" font-size="11" font-family="Jua, sans-serif" fill="#1E2B4A">${i || 12}</text>`).join('');
+    return `<svg class="clockface" width="${size}" height="${size}" viewBox="0 0 100 100" role="img" aria-label="시계"><circle cx="50" cy="50" r="46" fill="#FFF8EA" stroke="#1E2B4A" stroke-width="3"/>${ticks}<path d="M50 50L${a(((h % 12) + m / 60) * 30, 22)}" stroke="#1E2B4A" stroke-width="5" stroke-linecap="round"/><path d="M50 50L${a(m * 6, 34)}" stroke="#F08A3C" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="50" r="3.5" fill="#1E2B4A"/></svg>`;
+  }
 
   // Text colour that stays readable on a team colour (WCAG: pick the higher-contrast of white / deep navy).
   function inkOn(hex) {
@@ -62,12 +86,21 @@
     bigger: ['더 큰 수는?', '', ['748', '847'], 1], next: ['2 · 4 · 6 · ?', '', ['8', '7', '9', '10'], 0],
     nonsense: ['왕이 넘어지면?', '', ['킹콩', '우하하', '피자', '언덕'], 0], capital: ['프랑스', '수도는?', ['파리', '런던', '로마', '베를린'], 0],
     trivia: ['거미 다리는?', '', ['8개', '6개', '10개', '4개'], 0],
+    gugu: ['7 × 8', '', ['56', '54', '63', '48'], 0], clock: ['🕒', '몇 시?', ['3시', '9시', '12시 15분', '3시 30분'], 0],
+    money: ['500원×1  100원×2', '모두 얼마?', ['700원', '600원', '750원', '800원'], 0], sum10: ['7 + ?', '= 10', ['3', '4', '2', '7'], 0],
+    stars: ['★★★ ★★', '몇 개?', ['5개', '4개', '6개', '3개'], 0], engsent: ['I ___ a cat.', '', ['have', 'has', 'is', 'am'], 0],
+    engopp: ['hot', '반대말은?', ['cold', 'big', 'up', 'sad'], 0], hanjaword: ['火 + 山', '', ['화산', '산수', '입구', '대문'], 0],
+    mimic: ['비가 ○○ 내려요', '', ['주룩주룩', '멍멍', '깡충깡충', '꿀꿀'], 0], groupname: ['당근 · 오이 · 감자', '', ['채소', '과일', '악기', '날씨'], 0],
+    job: ['불을 꺼요', '누구일까요?', ['소방관', '요리사', '화가', '농부'], 0], riddle: ['깎을수록 커지는 것은?', '', ['구멍', '연필', '사과', '손톱'], 0],
+    scramble: ['개 · 무 · 지', '', ['무지개', '지개무', '개지무', '무개지'], 0], mixarrow: ['→', '반대쪽!', ['←', '→'], 0],
+    animalox: ['박쥐는 포유류', '', ['O', 'X'], 0], food: ['ㄸㅂㅇ', '분식', ['떡볶이', '김밥', '라면', '순대'], 0],
+    idiom: ['작심 ○○', '', ['삼일', '이조', '서답', '무환'], 0], abbr: ['ASAP', '', ['가능한 한 빨리', '참고로', '연구 개발', '자주 묻는 질문'], 0],
   };
   function demo(id, color) {
     const c = color || 'var(--accent-2)';
     let body = '';
     if (id === 'tap' || id === 'shake') body = `<div class="dm-tap ${id}" style="background:${c};color:${inkOn(color || '#F08A3C')}">${id === 'shake' ? '흔들어요!' : '눌러요!'}<i class="dm-finger">${ICONS.tap}</i></div>`;
-    else if (DEMO_Q[id]) { const [big, small, ch, ans] = DEMO_Q[id]; body = `<div class="dm-q"><b style="${id === 'stroop' ? 'color:var(--bad)' : ''}">${big}</b>${small ? `<small>${small}</small>` : ''}</div><div class="dm-ch ${ch.length === 2 ? 'two' : ''}">${ch.map((x, i) => `<span class="${i === ans ? 'ok' : ''}">${x}</span>`).join('')}</div>`; }
+    else if (DEMO_Q[id]) { let [big, small, ch, ans] = DEMO_Q[id]; if (id === 'clock') big = clockFace(3, 0, 64); body = `<div class="dm-q"><b style="${id === 'stroop' ? 'color:var(--bad)' : ''}">${big}</b>${small ? `<small>${small}</small>` : ''}</div><div class="dm-ch ${ch.length === 2 ? 'two' : ''}">${ch.map((x, i) => `<span class="${i === ans ? 'ok' : ''}">${x}</span>`).join('')}</div>`; }
     else if (id === 'order') body = `<div class="dm-hint">다음 숫자 <b>1</b></div><div class="dm-grid g12">${[7, 2, 11, 1, 9, 4, 12, 3, 6, 10, 5, 8].map((n) => `<span class="${n <= 3 ? 'go n' + n : ''}">${n}</span>`).join('')}</div>`;
     else if (id === 'memory') body = `<div class="dm-hint">잘 보고 따라 눌러요</div><div class="dm-grid g9">${Array.from({ length: 9 }, (_, i) => `<span class="${[4, 0, 8].includes(i) ? 'lit l' + [4, 0, 8].indexOf(i) : ''}"></span>`).join('')}</div>`;
     else if (id === 'alt') body = `<div class="dm-hint">번갈아 콩콩!</div><div class="dm-feet"><span class="a">왼발</span><span class="b">오른발</span></div>`;
@@ -163,5 +196,5 @@
   function sfx(name) { if (muted || !ac || !SFX[name]) return; const t = ac.currentTime + 0.01; SFX[name].forEach(([f, d, dur, type, vol]) => tone(f, t + d, dur, type, vol)); }
   function setMuted(m) { muted = !!m; }
 
-  window.UI = { icon, inkOn, demo, avatar, scene, art, rosette, stopwatch, wedge, comic, setThemeAttr, sfx, setMuted };
+  window.UI = { clockFace, icon, inkOn, demo, avatar, scene, art, rosette, stopwatch, wedge, comic, setThemeAttr, sfx, setMuted };
 })();

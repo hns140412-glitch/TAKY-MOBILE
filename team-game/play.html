@@ -40,6 +40,16 @@
   .join input { width: 100%; height: 60px; border-radius: var(--r-md); border: 2px solid var(--line); background: #fff; padding: 0 16px; font: inherit; font-size: 21px; font-weight: 700; color: #1E2B4A; text-align: center; }
   .sugg { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
   .sugg .chip { min-height: 44px; padding: 0 14px; }
+  .crewpick { margin-top: 4px; }
+  .cph { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 20px; text-align: center; }
+  .cps { text-align: center; font-size: 14px; margin-top: 2px; }
+  .cgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .cc { position: relative; aspect-ratio: 1 / 1.1; min-height: 72px; border-radius: 14px; border: 2px solid var(--line); background: rgba(255,255,255,.75); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; padding: 0; }
+  .cc img { height: 96%; width: auto; pointer-events: none; }
+  .cc.on { border: 3px solid var(--accent); background: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent), 0 4px 0 var(--btn-edge); transform: translateY(-2px); }
+  .cc.on::after { content: '✓'; position: absolute; top: 4px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 800; display: grid; place-items: center; }
+  .cc[disabled] img { filter: grayscale(1); opacity: .35; }
+  .cc .tk { position: absolute; left: 0; right: 0; top: 40%; text-align: center; font-size: 12px; font-weight: 800; color: #1E2B4A; background: rgba(255,255,255,.85); }
   .err { color: var(--bad); font-weight: 700; min-height: 1.4em; font-size: var(--fs-sm); }
   .big { width: 100%; min-height: 64px; font-size: 21px; }
 
@@ -81,6 +91,8 @@
   .prompt .pb { font-size: 64px; line-height: 1.1; font-weight: 800; }
   .prompt .pb.long { font-size: 24px; line-height: 1.4; }
   .prompt .pb.mid { font-size: 32px; line-height: 1.25; }
+  .prompt .clockface { display: block; margin: 0 auto; }
+  .together { margin-top: 8px; padding: 6px 10px; border-radius: 12px; background: color-mix(in srgb, var(--good, #2FA36B) 16%, transparent); color: var(--ink); font-weight: 700; }
   .choices.two.words .ch { font-size: 30px; }
   .prompt .ps { font-size: 16px; color: var(--ink-soft); margin-top: 8px; font-weight: 700; }
   .prompt.ok { animation: ok 380ms; } .prompt.no { animation: no 380ms; }
@@ -154,8 +166,11 @@ function onMsg(m) {
   if (m.t === 'error') {
     if (m.code === 'NO_TEAM') { store.del(KEY); me = null; return renderJoin(); }
     if (m.code === 'NO_ROOM') { V.innerHTML = `<div class="center"><h2 class="display">방을 찾을 수 없어요</h2><p class="soft">진행 화면의 QR을 다시 찍어 주세요.</p></div>`; return; }
-    const e = $('#err'); if (e) e.textContent = m.text; const b = $('#joinBtn'); if (b) b.disabled = false; return;
+    const e = $('#err'); if (e) e.textContent = m.text; const b = $('#joinBtn'); if (b) b.disabled = false;
+    if (m.code === 'CREW') { pickedCrew = null; peekRoom(); }
+    return;
   }
+  if (m.t === 'room') { roomInfo = m; if (m.theme) UI.setThemeAttr(m.theme); paintCrew(); return; }
   if (m.t === 'joined') { me = { teamId: m.teamId, token: m.token }; store.set(KEY, me); UI.sfx('join'); return; }
   if (m.t === 'kicked') { store.del(KEY); me = null; return renderJoin('진행자가 팀을 정리했어요. 다시 들어와 주세요.'); }
   if (m.t === 'progress') { if (S && S.round) { S.progress = m.progress; onProgress(); } return; }
@@ -178,9 +193,22 @@ function renderJoin(note) {
     <h1 class="display">우리 팀 이름은?</h1><p class="soft" style="margin-top:6px">팀마다 폰 한 대면 충분해요</p>
     <form class="join" id="jf"><input id="nm" maxlength="12" autocomplete="off" placeholder="예: 파도팀" aria-label="팀 이름">
     <div class="sugg">${NAMES.sort(() => Math.random() - .5).slice(0, 4).map((n) => `<button type="button" class="chip" data-n="${n}">${n}</button>`).join('')}</div>
+    <div class="crewpick hidden" id="cp"><h2 class="cph">우리 팀 탐험대원 고르기</h2><p class="soft cps" id="cps">한 명을 골라 주세요 · 안 고르면 자동으로 정해져요</p><div class="cgrid" id="cg" role="radiogroup" aria-label="탐험대원"></div></div>
     <p class="err" id="err">${note ? esc(note) : ''}</p><button class="btn primary big" id="joinBtn">들어가기</button></form></div></div>`;
   V.querySelectorAll('[data-n]').forEach((b) => b.onclick = () => { $('#nm').value = b.dataset.n; });
-  $('#jf').onsubmit = (e) => { e.preventDefault(); const name = $('#nm').value.trim(); if (!name) return ($('#err').textContent = '팀 이름을 적어 주세요.'); $('#joinBtn').disabled = true; net.send({ t: 'join', code, name }); };
+  $('#jf').onsubmit = (e) => { e.preventDefault(); const name = $('#nm').value.trim(); if (!name) return ($('#err').textContent = '팀 이름을 적어 주세요.'); $('#joinBtn').disabled = true; net.send({ t: 'join', code, name, ...(pickedCrew ? { crew: pickedCrew } : {}) }); };
+  paintCrew(); peekRoom(); clearInterval(peekT); peekT = setInterval(() => { if (view === 'join') peekRoom(); else clearInterval(peekT); }, 3000);
+}
+// Crew picker (learn pack): every team picks its own explorer; members other teams took are greyed out.
+let roomInfo = null, pickedCrew = null, peekT = null;
+function peekRoom() { if (code) net.send({ t: 'peek', code }); }
+function paintCrew() {
+  const box = $('#cp'), g = $('#cg'); if (!box || !g) return;
+  const show = roomInfo && roomInfo.pack !== 'event'; box.classList.toggle('hidden', !show); if (!show) return;
+  const taken = new Set(roomInfo.taken || []); if (pickedCrew && taken.has(pickedCrew)) pickedCrew = null;
+  g.innerHTML = Array.from({ length: 24 }, (_, i) => i + 1).map((n) => { const off = taken.has(n), on = pickedCrew === n; return `<button type="button" class="cc${on ? ' on' : ''}" data-c="${n}" role="radio" aria-checked="${on}" aria-label="대원 ${n}${off ? ' · 다른 팀이 골랐어요' : ''}" ${off ? 'disabled' : ''}><img src="art/crew/${String(n).padStart(2, '0')}.webp" alt="" draggable="false">${off ? '<span class="tk">다른 팀</span>' : ''}</button>`; }).join('');
+  g.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => { const n = +b.dataset.c; pickedCrew = pickedCrew === n ? null : n; UI.sfx('tap'); paintCrew(); });
+  $('#cps').textContent = pickedCrew ? '좋아요! 이 대원과 함께 떠나요' : '한 명을 골라 주세요 · 안 고르면 자동으로 정해져요';
 }
 
 // ---------- screens ----------
@@ -301,7 +329,7 @@ function quizGame() {
   V.innerHTML = hud('맞힘 0') + `<div class="q"><div class="panel prompt" id="pr"></div><div class="choices" id="chs"></div></div>`;
   const draw = () => {
     if (!document.getElementById('pr')) return; const q = Q[qi % Q.length]; if (!q) { $('#pr').innerHTML = '<div><div class="pb">끝!</div><div class="ps">문제를 다 풀었어요</div></div>'; $('#chs').innerHTML = ''; return; }
-    $('#pr').dataset.qi = qi % Q.length; $('#pr').innerHTML = `<div><div class="pb ${q.prompt.long ? 'long' : q.prompt.mid ? 'mid' : ''}" style="${q.prompt.ink ? 'color:' + q.prompt.ink : ''}">${esc(q.prompt.big)}</div>${q.prompt.small ? `<div class="ps">${esc(q.prompt.small)}</div>` : ''}</div>`;
+    $('#pr').dataset.qi = qi % Q.length; $('#pr').innerHTML = `<div><div class="pb ${q.prompt.long ? 'long' : q.prompt.mid ? 'mid' : ''}" style="${q.prompt.ink ? 'color:' + q.prompt.ink : ''}">${q.prompt.clock ? UI.clockFace(q.prompt.clock[0], q.prompt.clock[1], 170) : esc(q.prompt.big)}</div>${q.prompt.small ? `<div class="ps">${esc(q.prompt.small)}</div>` : ''}</div>`;
     const chs = $('#chs'); chs.className = 'choices' + (q.choices.length === 2 ? ' two' + (q.choices.some((c) => c.length > 2) ? ' words' : '') : '');
     chs.innerHTML = q.choices.map((c, i) => `<button class="ch" data-i="${i}"><span class="k">${i + 1}</span><span>${esc(c)}</span></button>`).join('');
     chs.querySelectorAll('.ch').forEach((b) => b.addEventListener('pointerdown', (e) => {
@@ -383,14 +411,14 @@ function resultScreen() {
   if (!mine || mine.place === null) return waitScreen('이번엔 쉬었어요. 다음엔 같이 해요!', '큰 화면을 봐 주세요');
   const words = ['우리가 1등!', '아주 잘했어요!', '멋져요, 3등!'];
   V.innerHTML = `<div class="center res">${standWith(mine.place)}<div class="place" style="text-decoration-color:${S.team.color}">${mine.place + 1}등</div><h2 class="display">${mine.place < 3 ? words[mine.place] : '끝까지 잘했어요!'}</h2>
-    <div class="panel card2"><p class="ring">+${mine.points}점 · 지금 ${S.team.score}점</p><p class="soft" style="margin-top:4px">${esc(r.title)} · ${r.count}팀 중 ${mine.place + 1}등 · ${mine.value}${r.unit === 'ms' ? 'ms' : r.unit}</p></div></div>`;
+    <div class="panel card2"><p class="ring">+${mine.points}점 · 지금 ${S.team.score}점</p><p class="soft" style="margin-top:4px">${esc(r.title)} · ${r.count}팀 중 ${mine.place + 1}등 · ${mine.value}${r.unit === 'ms' ? 'ms' : r.unit}</p>${r.together ? `<p class="together">모든 탐험대가 끝까지 해냈어요! 다 함께 보너스 +2</p>` : ''}</div></div>`;
   buzz(mine.place === 0 ? [40, 60, 40, 60, 120] : 30);
 }
 function finalScreen() {
   const mine = S.final && S.final.find((x) => x.teamId === S.team.id), n = S.final ? S.final.length : 0;
   const shown = mine && n - mine.place <= S.revealStep;
   if (!shown) return waitScreen(pickLine(LINES.waitFinal), '최종 발표 중이에요');
-  V.innerHTML = `<div class="center res">${standWith(mine.place)}<div class="place" style="text-decoration-color:${S.team.color}">${mine.place + 1}등</div><h2 class="display">${mine.place === 0 ? (learn() ? '오늘의 최고 탐험대!' : '우승이에요!') : '같이 놀아서 즐거웠어요'}</h2><div class="panel card2"><p class="ring">${S.team.score}점</p></div></div>`;
+  V.innerHTML = `<div class="center res">${standWith(mine.place)}<div class="place" style="text-decoration-color:${S.team.color}">${mine.place + 1}등</div><h2 class="display">${learn() ? (mine.place === 0 ? '오늘의 최고 탐험대!' : '탐험 수료!') : mine.place === 0 ? '우승이에요!' : '같이 놀아서 즐거웠어요'}</h2><div class="panel card2"><p class="ring">${S.team.score}점</p>${learn() && mine.praise ? `<p class="soft" style="margin-top:4px">${esc(mine.praise)}</p>` : ''}</div></div>`;
   buzz(mine.place === 0 ? [60, 60, 60, 60, 200] : 40);
   if (mine.place === 0) UI.sfx('fanfare');
 }

@@ -8,9 +8,10 @@
 import crypto from 'node:crypto';
 import R from './rounds.cjs';
 
-const { FAMILIES, ROUNDS, buildContent, placePoints } = R;
+const { FAMILIES, ROUNDS, buildContent, placePoints, viewOf } = R;
 export const MAX_TEAMS = 16;
 export const INTRO_MS = 5000;
+const TOGETHER_BONUS = 2;
 const ROOM_TTL = 3 * 864e5;
 const ONLINE_MS = 15000;
 const BEAT_MS = 6000;
@@ -22,6 +23,7 @@ const CODE_RE = /^\d{4}$/;
  kv interface (all async):
    get(key) -> { data } | null     put(key, data)     del(key)     list(prefix) -> [key]
 */
+const CREW_COUNT = 24;
 const JOIN_WAIT_MS = 6000;   // a joining phone waits this long for the host screen to admit it
 const JOIN_STALE_MS = 6500;  // the host ignores join requests older than this (that phone already gave up)
 const K = {
@@ -31,8 +33,8 @@ const K = {
   seen: (c, t) => `seen/${c}/${t}`,
 };
 
-const packRounds = (pack) => ROUNDS.filter((r) => r.pack === 'both' || r.pack === pack);
-const defOf = (rid) => ROUNDS.find((d) => d.id === rid);
+const packRounds = (pack) => ROUNDS.filter((r) => r.pack === 'both' || r.pack === pack).map((d) => viewOf(d, pack));
+const defOf = (rid, pack) => { const d = ROUNDS.find((x) => x.id === rid); return d && viewOf(d, pack); };
 const err = (code, text) => ({ t: 'error', code, text });
 const NO_ROOM = () => err('NO_ROOM', '방을 찾을 수 없어요. 진행 화면의 QR을 다시 찍어 주세요.');
 
@@ -70,8 +72,9 @@ async function mergeJoins(kv, room, now) {
     else if (room.teams.some((t) => t.name === j.name)) room.rejected[j.id] = 'DUP';
     else {
       const used = new Set(room.teams.map((t) => t.crew));
-      const free = Array.from({ length: 24 }, (_, i) => i + 1).filter((n) => !used.has(n));
-      room.teams.push({ id: j.id, token: j.token, name: j.name, crew: free[crypto.randomInt(0, free.length)] || 1, color: TEAM_COLORS[room.teams.length % TEAM_COLORS.length], score: 0, best: {}, joinedAt: j.at });
+      const free = Array.from({ length: CREW_COUNT }, (_, i) => i + 1).filter((n) => !used.has(n));
+      const crew = free.includes(j.crew) ? j.crew : free[crypto.randomInt(0, free.length)] || 1; // the team's pick, or any free crew member
+      room.teams.push({ id: j.id, token: j.token, name: j.name, crew, color: TEAM_COLORS[room.teams.length % TEAM_COLORS.length], score: 0, best: {}, joinedAt: j.at });
     }
     const ids = Object.keys(room.rejected); if (ids.length > 40) delete room.rejected[ids[0]];
     changed = true;
@@ -118,7 +121,7 @@ export async function createRoom(kv, packIn, now = Date.now()) {
 const publicTeams = (room, seen, now) => room.teams.map(({ token, ...t }) => ({ ...t, online: now - (seen[t.id] || 0) < ONLINE_MS })); // eslint-disable-line no-unused-vars
 function roundMeta(room) {
   const r = room.round; if (!r) return null;
-  const def = defOf(r.id);
+  const def = defOf(r.id, room.pack);
   return { id: r.id, title: def.title, how: def.how, kind: def.kind, input: def.input || null, family: def.family, seconds: def.seconds, unit: def.unit, better: def.better || 'high', startsAt: r.startsAt, endsAt: r.endsAt, index: room.roundIdx };
 }
 function metricValue(kind, m) {
@@ -148,8 +151,8 @@ async function playerState(kv, room, teamId, now) {
     teamCount: room.teams.length, round: roundMeta(room),
     content: r && room.phase !== 'lobby' ? r.content : null,
     progress: prog ? prog.data : null,
-    lastResult: last ? { id: last.id, title: last.title, unit: last.unit, mine: last.rows.find((x) => x.teamId === teamId) || null, count: last.rows.length } : null,
-    final: room.phase === 'final' ? finalRows(room).map((x) => ({ teamId: x.id, place: x.place })) : null,
+    lastResult: last ? { id: last.id, title: last.title, unit: last.unit, mine: last.rows.find((x) => x.teamId === teamId) || null, count: last.rows.length, together: !!last.together } : null,
+    final: room.phase === 'final' ? finalRows(room).map((x) => ({ teamId: x.id, place: x.place, praise: praiseFor(room, x) })) : null,
     revealStep: room.revealStep, draw: room.draw && room.draw.teamId === teamId ? room.draw : null, now,
   };
 }
@@ -165,15 +168,18 @@ function startRound(room, roundId, now) {
 }
 function endRound(room, metrics, now) {
   const r = room.round; if (!r) return;
-  const def = defOf(r.id), low = def.better === 'low';
+  const def = defOf(r.id, room.pack), low = def.better === 'low';
   const rows = room.teams.map((t) => ({ teamId: t.id, name: t.name, color: t.color, crew: t.crew, value: metricValue(r.kind, metrics[t.id]) }));
   const played = rows.filter((x) => x.value !== null).sort((a, b) => (low ? a.value - b.value : b.value - a.value));
   let place = 0;
-  played.forEach((x, i) => { if (i > 0 && x.value !== played[i - 1].value) place = i; x.place = place; x.points = placePoints(place); });
+  played.forEach((x, i) => { if (i > 0 && x.value !== played[i - 1].value) place = i; x.place = place; x.points = placePoints(place, room.pack); });
+  // Family pack is cooperative: when every expedition took part, everyone gets the 'all together' bonus.
+  const together = room.pack === 'learn' && rows.length > 1 && rows.every((x) => x.value !== null && (low || x.value > 0));
+  if (together) rows.forEach((x) => { x.points += TOGETHER_BONUS; x.bonus = TOGETHER_BONUS; });
   rows.forEach((x) => { if (x.value === null) { x.place = null; x.points = 0; } });
   rows.forEach((x) => { const t = room.teams.find((tt) => tt.id === x.teamId); t.score += x.points; t.best = t.best || {}; t.best[r.id] = x.place; });
   rows.sort((a, b) => (a.place ?? 99) - (b.place ?? 99));
-  room.history.push({ id: r.id, title: def.title, unit: def.unit, better: def.better || 'high', rows, at: now });
+  room.history.push({ id: r.id, title: def.title, unit: def.unit, better: def.better || 'high', rows, together, at: now });
   room.round = null; room.phase = 'result';
 }
 function finalRows(room) {
@@ -188,7 +194,7 @@ function praiseFor(room, team) {
   const top = Math.min(...entries.map(([, p]) => p));
   const cands = entries.filter(([, p]) => p === top).map(([k]) => k);
   const pick = cands[[...team.id].reduce((a, ch) => a + ch.charCodeAt(0), 0) % cands.length];
-  const t = defOf(pick).title;
+  const t = defOf(pick, room.pack).title;
   const wins = entries.filter(([, p]) => p === 0).length;
   const unit = room.pack === 'event' ? '라운드' : '미션', who = room.pack === 'event' ? '팀' : '탐험대';
   if (top === 0) return wins > 1 ? `${wins}개 ${unit} 1등 · ${t}에서 특히 빛난 ${who}` : `${t} 1등을 차지한 ${who}`;
@@ -213,8 +219,10 @@ function onHost(room, msg, metricsP, now) {
     case 'kick': room.teams = room.teams.filter((x) => x.id !== msg.teamId); room.kicked = [...(room.kicked || []), String(msg.teamId)].slice(-50); return ch;
     case 'theme': if (['island', 'stage', 'paper'].includes(msg.theme)) { room.theme = msg.theme; return ch; } return null;
     case 'final': room.phase = 'final'; room.round = null; room.revealStep = 0; return ch;
-    case 'reveal': if (room.phase === 'final') { room.revealStep = Math.min(room.teams.length, room.revealStep + 1); return ch; } return null;
+    // company: last place first, one by one. family: the whole expedition graduates together.
+    case 'reveal': if (room.phase === 'final') { room.revealStep = room.pack === 'learn' ? room.teams.length : Math.min(room.teams.length, room.revealStep + 1); return ch; } return null;
     case 'draw': {
+      if (room.pack !== 'event') return null; // prize draw is a company-event thing
       room.draws = room.draws || [];
       const pool = room.teams.filter((t) => !room.draws.includes(t.id)); if (!pool.length) return null;
       const t = pool[crypto.randomInt(0, pool.length)]; room.draws.push(t.id);
@@ -276,6 +284,8 @@ export async function poll(kv, auth, now = Date.now()) {
   return [await playerState(kv, asSeen(room, now), team.id, now)];
 }
 
+// What a phone needs before joining: which pack, and which crew members are already taken.
+const peekOf = (room) => ({ t: 'room', code: room.code, pack: room.pack, theme: room.theme, taken: room.teams.map((t) => t.crew), teamCount: room.teams.length });
 const JOIN_ERR = { FULL: () => err('FULL', `팀은 ${MAX_TEAMS}개까지 들어올 수 있어요.`), DUP: () => err('DUP', '같은 이름의 팀이 있어요. 다른 이름으로 해 주세요.') };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -289,7 +299,9 @@ export async function send(kv, auth, msg, now = Date.now(), clock = Date.now) {
     if (!room) return [NO_ROOM()];
     if (room.teams.length >= MAX_TEAMS) return [JOIN_ERR.FULL()];
     if (room.teams.some((t) => t.name === name)) return [JOIN_ERR.DUP()];
-    const j = { id: id(6), token: id(16), name, at: now };
+    const crew = Number.isInteger(msg.crew) && msg.crew >= 1 && msg.crew <= CREW_COUNT ? msg.crew : null;
+    if (crew && room.teams.some((t) => t.crew === crew)) return [err('CREW', '다른 팀이 먼저 고른 대원이에요. 다른 대원을 골라 주세요.'), peekOf(room)];
+    const j = { id: id(6), token: id(16), name, crew, at: now };
     await kv.put(K.join(code, j.id), j);
     const until = clock() + JOIN_WAIT_MS;
     for (;;) {
@@ -305,6 +317,7 @@ export async function send(kv, auth, msg, now = Date.now(), clock = Date.now) {
       await wait(350);
     }
   }
+  if (msg.t === 'peek') { const room = await loadRoom(kv, code, now); return [room ? peekOf(room) : NO_ROOM()]; }
   if (msg.t === 'host' || msg.t === 'rejoin') return poll(kv, auth, now);
   if (auth.hostKey !== undefined) {
     if (auth.view) return poll(kv, auth, now); // the TV screen never changes the game
