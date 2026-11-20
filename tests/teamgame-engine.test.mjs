@@ -139,4 +139,39 @@ pr = (await send(kv, auth[1], { t: 'answer', qi: 1, choice: st.content[1].answer
 assert.equal(pr.value, 1);
 
 assert.equal((await poll(kv, { code: '12', hostKey: 'x' }, t))[0].code, 'NO_ROOM');
+// olympic mode: fixed programme, opening ceremony, archery arrows, medal table decides the final order
+{
+  const ol = await createRoom(kv, 'olympic', t), oh = { code: ol.code, hostKey: ol.hostKey };
+  let on = true; const loop = (async () => { while (on) { await poll(kv, oh, t + 100); await sleep(40); } })();
+  const oj = await Promise.all(['A', 'B', 'C'].map((name) => send(kv, { code: ol.code }, { t: 'join', code: ol.code, name }, t)));
+  on = false; await loop;
+  const oa = oj.map((m) => ({ code: ol.code, teamId: m[0].teamId, token: m[0].token }));
+  let os = (await poll(kv, oh, t))[0];
+  assert.equal(os.mode, 'olympic'); assert.equal(os.pack, 'event'); assert.equal(os.rounds.length, 8, '8 events');
+  assert.deepEqual(os.rounds.map((r) => r.id).slice(0, 3), ['o_sprint', 'o_lift', 'o_archery']);
+  assert.equal((await send(kv, oh, { t: 'start', round: 'tap' }, t))[0].round, null, 'normal missions are not in the olympic programme');
+  os = (await send(kv, oh, { t: 'opening' }, t))[0]; assert.equal(os.phase, 'opening');
+  assert.equal((await poll(kv, oa[0], t + 1000))[0].phase, 'opening', 'phones see the ceremony');
+  os = (await poll(kv, oh, t + 15_000))[0]; assert.equal(os.phase, 'lobby', 'ceremony ends by itself'); assert.equal(os.openingDone, true);
+  // archery: A shoots 10+10+9, B 5, C nothing; extra arrows past 5 and rings > 10 are ignored
+  let T = t + 20_000;
+  await send(kv, oh, { t: 'start', round: 'o_archery' }, T); T += INTRO_MS + 100;
+  for (const ring of [10, 10, 9, 10, 10, 10, 99]) await send(kv, oa[0], { t: 'arrow', ring }, T);
+  await send(kv, oa[1], { t: 'arrow', ring: 5 }, T);
+  os = (await poll(kv, oh, T + 40_000))[0]; os = (await poll(kv, oh, T + 40_100))[0];
+  assert.equal(os.phase, 'result'); assert.equal(os.lastResult.rows[0].value, 49, 'five arrows max, rings capped');
+  assert.equal(os.medals[oa[0].teamId].g, 1); assert.equal(os.medals[oa[1].teamId].s, 1); assert.equal(os.medals[oa[2].teamId].b, 0, 'no medal without playing');
+  // lift: C wins gold, B silver, A bronze -> A (1G 0S 1B) still beats C (1G 0S 0B)
+  await send(kv, oh, { t: 'toLobby' }, T + 40_200); T += 50_000;
+  await send(kv, oh, { t: 'start', round: 'o_lift' }, T); T += INTRO_MS + 2000;
+  await send(kv, oa[2], { t: 'count', n: 30 }, T); await send(kv, oa[1], { t: 'count', n: 20 }, T); await send(kv, oa[0], { t: 'count', n: 10 }, T);
+  os = (await poll(kv, oh, T + 20_000))[0]; os = (await poll(kv, oh, T + 20_100))[0];
+  const me = (await poll(kv, oa[0], T + 20_200))[0]; assert.deepEqual(me.medals, { g: 1, s: 0, b: 1 }, 'phone sees its medals');
+  await send(kv, oh, { t: 'final' }, T + 20_300);
+  const orows = await final(kv, ol.code, ol.hostKey, T + 20_300);
+  const order = orows.map((r) => r.name);
+  assert.equal(order[0], 'A', 'more medals of the same colour wins: A 1G1B over C 1G'); assert.equal(order[1], 'C'); assert.equal(order[2], 'B');
+  assert.ok(orows[0].praise.includes('금메달'), 'olympic praise names the gold events'); assert.equal(orows[2].praise, '시상대에 오른 팀');
+}
+
 console.log('engine tests: PASS');

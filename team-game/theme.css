@@ -182,4 +182,8 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .dm-stop b { position: absolute; left: 0; right: 0; top: 56%; text-align: center; font-family: var(--font-display); font-size: 20px; color: #1E2B4A; }
 .dm-btn { height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--cta-bg); color: var(--cta-ink); font-family: var(--font-display); font-size: 22px; box-shadow: 0 4px 0 var(--cta-edge); animation: dmPress 1.2s ease-in-out infinite; }
 .hidden { display: none !important; }
+/* archery demo + game target (olympic) */
+.dm-bow { position: relative; height: 70px; margin: 8px 6px; border-radius: 35px; background: linear-gradient(90deg, #F2F2F2 0 10%, #1E2B4A 10% 22%, #3E7BFA 22% 34%, #E5484D 34% 44%, #F7C948 44% 56%, #E5484D 56% 66%, #3E7BFA 66% 78%, #1E2B4A 78% 90%, #F2F2F2 90%); box-shadow: inset 0 0 0 2px rgba(0,0,0,.2); }
+.dm-bow .mk { position: absolute; top: -6px; bottom: -6px; width: 4px; border-radius: 2px; background: #111; left: 20%; animation: dmbow 1.6s ease-in-out infinite alternate; }
+@keyframes dmbow { to { left: 78%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; } }

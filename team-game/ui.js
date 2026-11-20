@@ -47,6 +47,15 @@
     food: S('<path d="M6 26h36c0 9-8 15-18 15S6 35 6 26z" fill="var(--panel-solid)"/><path d="M16 20c0-4 3-4 3-8M24 20c0-4 3-4 3-8M32 20c0-4 3-4 3-8" stroke="var(--accent-2)"/>'),
     idiom: S('<rect x="5" y="5" width="17" height="17" rx="3" fill="var(--panel-solid)"/><rect x="26" y="5" width="17" height="17" rx="3" fill="var(--panel-solid)"/><rect x="5" y="26" width="17" height="17" rx="3" stroke-dasharray="3 3"/><rect x="26" y="26" width="17" height="17" rx="3" stroke-dasharray="3 3" stroke="var(--accent-2)"/>'),
     abbr: S('<rect x="6" y="8" width="36" height="32" rx="5" fill="var(--panel-solid)"/><path d="M6 16h36"/><path d="M12 26l3-6 3 6M13 24.5h4M22 20v6h4M30 20h5v6h-5" stroke="var(--accent-2)" stroke-width="2.2"/>'),
+    o_torch: S('<path d="M17 20h14l-4 22h-6z" fill="var(--panel-solid)"/><path d="M15 20h18"/><path d="M24 4c5 5 6 9 3 13h-6c-3-4-2-8 3-13z" fill="var(--gold)" stroke="var(--accent-2)"/>'),
+    o_sprint: S('<circle cx="29" cy="8" r="4" fill="var(--panel-solid)"/><path d="M27 14l-7 9 6 5-3 12M20 23l-8-1M26 18l8 5 6-3M23 30l-9 6"/><path d="M4 44h40" stroke="var(--accent-2)" stroke-dasharray="4 4"/>'),
+    o_lift: S('<path d="M6 16h36"/><rect x="4" y="9" width="5" height="14" rx="1.5" fill="var(--accent-2)" stroke="var(--accent-2)"/><rect x="39" y="9" width="5" height="14" rx="1.5" fill="var(--accent-2)" stroke="var(--accent-2)"/><circle cx="24" cy="24" r="4" fill="var(--panel-solid)"/><path d="M16 16l5 10M32 16l-5 10M24 28v8M24 36l-6 8M24 36l6 8"/>'),
+    o_archery: S('<circle cx="24" cy="24" r="19" fill="var(--panel-solid)"/><circle cx="24" cy="24" r="12" stroke="var(--accent-2)"/><circle cx="24" cy="24" r="5" fill="var(--gold)" stroke="var(--gold)"/><path d="M24 24l16-16M34 6l6 2 2 6" stroke="var(--bad)"/>'),
+    o_shoot: S('<circle cx="24" cy="24" r="16" fill="var(--panel-solid)"/><path d="M24 4v10M24 34v10M4 24h10M34 24h10"/><circle cx="24" cy="24" r="3" fill="var(--good)" stroke="var(--good)"/>'),
+    o_fence: S('<path d="M8 40L36 12M32 8l8 8"/><path d="M40 40L12 12M8 16l8-8" stroke="var(--accent-2)"/><circle cx="8" cy="40" r="3" fill="currentColor"/><circle cx="40" cy="40" r="3" fill="var(--accent-2)" stroke="var(--accent-2)"/>'),
+    o_gym: S('<circle cx="24" cy="10" r="4" fill="var(--panel-solid)"/><path d="M24 14v14l-8 12M24 28l8 12M12 18l12 4 12-4"/><path d="M6 30c6-10 30-16 36-4" stroke="var(--accent-2)" stroke-dasharray="3 4"/>'),
+    o_curling: S('<ellipse cx="24" cy="32" rx="16" ry="8" fill="var(--panel-solid)"/><path d="M8 32v-4c0-4 7-8 16-8s16 4 16 8v4"/><path d="M20 20v-6h12" stroke="var(--accent-2)"/>'),
+    o_relay: S('<circle cx="16" cy="14" r="4" fill="var(--panel-solid)"/><path d="M20 18l10 6M4 30c4-3 8-3 12 0s8 3 12 0 8-3 12 0 6 2 8 1" stroke="var(--accent-2)"/><path d="M4 38c4-3 8-3 12 0s8 3 12 0 8-3 12 0 6 2 8 1" stroke="var(--accent-2)" opacity=".6"/><path d="M16 18l-6 8"/>'),
     gift: S('<rect x="7" y="20" width="34" height="22" rx="3" fill="var(--panel-solid)"/><rect x="5" y="13" width="38" height="8" rx="2" fill="var(--gold)" stroke="var(--gold)"/><path d="M24 13v29" stroke="var(--bad)" stroke-width="3"/><path d="M24 13c-4-8-14-6-10 0M24 13c4-8 14-6 10 0"/>'),
     flag: S('<path d="M12 43V6"/><path d="M12 7h24l-6 7 6 7H12" fill="var(--gold)" stroke="var(--gold)"/>'),
   };
@@ -94,9 +103,11 @@
     job: ['불을 꺼요', '누구일까요?', ['소방관', '요리사', '화가', '농부'], 0], riddle: ['깎을수록 커지는 것은?', '', ['구멍', '연필', '사과', '손톱'], 0],
     scramble: ['개 · 무 · 지', '', ['무지개', '지개무', '개지무', '무개지'], 0], mixarrow: ['→', '반대쪽!', ['←', '→'], 0],
     animalox: ['박쥐는 포유류', '', ['O', 'X'], 0], food: ['ㄸㅂㅇ', '분식', ['떡볶이', '김밥', '라면', '순대'], 0],
+    o_fence: ['→', '피하기!', ['←', '→'], 0],
     idiom: ['작심 ○○', '', ['삼일', '이조', '서답', '무환'], 0], abbr: ['ASAP', '', ['가능한 한 빨리', '참고로', '연구 개발', '자주 묻는 질문'], 0],
   };
-  function demo(id, color) {
+  function demo(id, color, base) {
+    if (base && base !== id && !DEMO_Q[id] && id !== 'o_archery') id = base;
     const c = color || 'var(--accent-2)';
     let body = '';
     if (id === 'tap' || id === 'shake') body = `<div class="dm-tap ${id}" style="background:${c};color:${inkOn(color || '#F08A3C')}">${id === 'shake' ? '흔들어요!' : '눌러요!'}<i class="dm-finger">${ICONS.tap}</i></div>`;
@@ -105,6 +116,7 @@
     else if (id === 'memory') body = `<div class="dm-hint">잘 보고 따라 눌러요</div><div class="dm-grid g9">${Array.from({ length: 9 }, (_, i) => `<span class="${[4, 0, 8].includes(i) ? 'lit l' + [4, 0, 8].indexOf(i) : ''}"></span>`).join('')}</div>`;
     else if (id === 'alt') body = `<div class="dm-hint">번갈아 콩콩!</div><div class="dm-feet"><span class="a">왼발</span><span class="b">오른발</span></div>`;
     else if (id === 'stop') body = `<div class="dm-stop">${stopwatch('dmsw')}<b>5.00?</b></div><div class="dm-btn">멈춰!</div>`;
+    else if (id === 'o_archery') body = `<div class="dm-hint">가운데 올 때 쏘세요!</div><div class="dm-bow"><i class="tg"></i><i class="mk"></i></div><div class="dm-btn">쏘기!</div>`;
     else if (id === 'react') body = `<div class="dm-react"><span class="w">기다려요…</span><span class="g">지금!</span></div>`;
     return `<div class="demo" aria-label="폰에서 하는 방법"><div class="dm-phone"><div class="dm-notch"></div>${body}</div><p class="dm-cap">폰에서는 이렇게!</p></div>`;
   }

@@ -92,6 +92,13 @@
   .prompt .pb.long { font-size: 24px; line-height: 1.4; }
   .prompt .pb.mid { font-size: 32px; line-height: 1.25; }
   .prompt .clockface { display: block; margin: 0 auto; }
+  .archery { display: grid; gap: 14px; padding: 10px 4px; text-align: center; }
+  .bow { position: relative; height: 110px; border-radius: 55px; background: linear-gradient(90deg, #F2F2F2 0 10%, #1E2B4A 10% 22%, #3E7BFA 22% 34%, #E5484D 34% 44%, #F7C948 44% 56%, #E5484D 56% 66%, #3E7BFA 66% 78%, #1E2B4A 78% 90%, #F2F2F2 90%); box-shadow: inset 0 0 0 3px rgba(0,0,0,.25), var(--shadow-1); }
+  .bow .mk { position: absolute; top: -10px; bottom: -10px; width: 6px; margin-left: -3px; border-radius: 3px; background: #111; box-shadow: 0 0 0 2px #fff; }
+  .bow .hit { position: absolute; top: 44%; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #111; }
+  .arrows { display: flex; justify-content: center; gap: 8px; } .arrows span { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 22px; background: var(--panel-solid); box-shadow: inset 0 0 0 2px var(--line); }
+  .arrows span.shot { background: var(--gold); box-shadow: none; color: #1E2B4A; }
+  .medals-me { display: flex; justify-content: center; gap: 14px; margin-top: 6px; } .medals-me span { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 20px; }
   .together { margin-top: 8px; padding: 6px 10px; border-radius: 12px; background: color-mix(in srgb, var(--good, #2FA36B) 16%, transparent); color: var(--ink); font-weight: 700; }
   .choices.two.words .ch { font-size: 30px; }
   .prompt .ps { font-size: 16px; color: var(--ink-soft); margin-top: 8px; font-weight: 700; }
@@ -217,7 +224,8 @@ function render() {
   document.body.classList.toggle('play', S.phase === 'play');
   UI.art(S.phase === 'result' || S.phase === 'final' ? 'island' : S.phase === 'play' ? 'base' : 'camp');
   if (!S.team) return renderJoin();
-  if (S.phase === 'lobby') return waitScreen(S.lastResult ? pickLine(LINES.between) : pickLine(LINES.lobby), S.lastResult ? `다음 ${learn() ? '미션' : '라운드'}을 고르는 중이에요` : `지금 ${S.teamCount}팀이 들어왔어요 · 큰 화면을 봐 주세요`);
+  if (S.phase === 'opening') return waitScreen('개막식이 열렸어요! 큰 화면에서 우리 선수단 입장을 보세요', '입장이 끝나면 첫 종목이 시작돼요');
+  if (S.phase === 'lobby') return waitScreen(S.lastResult ? pickLine(LINES.between) : pickLine(LINES.lobby), S.lastResult ? `다음 ${S.mode === 'olympic' ? '종목' : learn() ? '미션' : '라운드'}을 준비하는 중이에요` : `지금 ${S.teamCount}팀이 들어왔어요 · 큰 화면을 봐 주세요`);
   if (S.phase === 'intro') return introScreen();
   if (S.phase === 'play') return playScreen();
   if (S.phase === 'result') return resultScreen();
@@ -230,13 +238,14 @@ const LINES = {
 };
 const EVENT_LINES = { lobby: ['준비 완료! 시작만 기다려요', '오늘 우승은 우리 거예요', '손가락 풀어 두세요', '다른 팀도 곧 들어와요'], between: ['물 한 모금 마시고 갈까요?', '방금 그거, 꽤 멋졌어요', '다음 건 더 잘할 수 있어요!', '숨 고르기, 후— 하—'], waitFinal: LINES.waitFinal };
 const pickLine = (a) => { const k = Object.keys(LINES).find((x) => LINES[x] === a); const src = !learn() && k ? EVENT_LINES[k] : a; return src[Math.floor(Math.random() * src.length)]; };
+const myMedals = () => (S.mode === 'olympic' && S.medals ? `<div class="medals-me">${[['g', 0, '금'], ['s', 1, '은'], ['b', 2, '동']].map(([k, p, n]) => `<span aria-label="${n}메달 ${S.medals[k]}개">${UI.rosette(p, 30)}${S.medals[k]}</span>`).join('')}</div>` : '');
 function waitScreen(line, sub) {
-  V.innerHTML = `<div class="center wait"><div class="bubble">${esc(line)}</div><div class="orb">${ava(S.pack === 'event' ? 150 : 290)}</div><div class="panel card2 named"><div class="tabwrap"><span class="banner">${esc(S.team.name)}</span></div><p class="soft" style="font-weight:700">${esc(sub)}</p></div></div>`;
+  V.innerHTML = `<div class="center wait"><div class="bubble">${esc(line)}</div><div class="orb">${ava(S.pack === 'event' ? 150 : 290)}</div><div class="panel card2 named"><div class="tabwrap"><span class="banner">${esc(S.team.name)}</span></div><p class="soft" style="font-weight:700">${esc(sub)}</p>${myMedals()}</div></div>`;
 }
 function introScreen() {
   const r = S.round;
-  V.innerHTML = `${UI.comic()}<div class="center intro"><span class="wrap-banner"><span class="banner">${UI.icon(r.id)}다음 ${learn() ? '미션' : '라운드'}</span></span><h1 class="display">${esc(r.title)}</h1><p class="how">${esc(r.how)}</p><div class="sw">${UI.stopwatch('cw')}<div class="cd" id="cd">5</div></div>${r.id === 'shake' ? '<button class="btn primary" id="perm">흔들기 켜기</button>' : ''}</div>`;
-  if (r.id === 'shake') $('#perm').onclick = askMotion;
+  V.innerHTML = `${UI.comic()}<div class="center intro"><span class="wrap-banner"><span class="banner">${UI.icon(r.id)}${S.mode === 'olympic' ? `제${S.eventNo + 1}종목` : `다음 ${learn() ? '미션' : '라운드'}`}</span></span><h1 class="display">${esc(r.title)}</h1><p class="how">${esc(r.how)}</p><div class="sw">${UI.stopwatch('cw')}<div class="cd" id="cd">5</div></div>${r.id === 'shake' ? '<button class="btn primary" id="perm">흔들기 켜기</button>' : ''}</div>`;
+  if ((r.base || r.id) === 'shake') $('#perm').onclick = askMotion;
   let lastN = null;
   tick = setInterval(() => { const ms = r.startsAt - net.now(), l = Math.ceil(ms / 1000); const el = $('#cd'); if (!el) return; const cw = $('#cw'); if (cw) cw.setAttribute('d', UI.wedge(ms / 5000)); const v = l > 0 ? l : '시작!'; if (v !== lastN) { lastN = v; el.textContent = v; buzz(l > 0 ? 15 : 60); } }, 100);
 }
@@ -255,7 +264,8 @@ function playScreen() {
   if (r.kind === 'count' && r.input === 'order') return orderGame();
   if (r.kind === 'count' && r.input === 'alt') return altGame();
   if (r.kind === 'timing') return stopGame();
-  if (r.kind === 'count') return tapGame(r.id === 'shake');
+  if (r.kind === 'arrows') return archeryGame();
+  if (r.kind === 'count') return tapGame((r.base || r.id) === 'shake');
   if (r.kind === 'quiz') return quizGame();
   if (r.kind === 'level') return memoryGame();
   if (r.kind === 'react') return reactGame();
@@ -288,6 +298,27 @@ function altGame() {
   runClock();
 }
 // timing: start, count 5 seconds in your head, stop. Best of 3 (closest).
+// archery (olympic): a marker sweeps across the target; tap when it is in the gold. 5 arrows, each faster.
+function archeryGame() {
+  const A = S.content, done = (S.progress && S.progress.best) ? S.progress.best.slice() : []; let raf = 0, t0 = performance.now();
+  V.innerHTML = hud(done.length ? `${done.reduce((a, b) => a + b, 0)}점` : '0점') + `<div class="archery"><p class="hint" id="hn">조준점이 한가운데(노랑) 올 때 쏘세요!</p>
+    <div class="bow" id="bow"><i class="mk" id="mk"></i></div><div class="arrows" id="ar"></div><button class="btn cta big" id="fire">쏘기!</button></div>`;
+  const mk = $('#mk'), bow = $('#bow'), fire = $('#fire');
+  const paintArrows = () => { $('#ar').innerHTML = Array.from({ length: A.length }, (_, i) => `<span class="${i < done.length ? 'shot' : ''}">${i < done.length ? done[i] : '·'}</span>`).join(''); };
+  const pos = () => { const a = A[Math.min(done.length, A.length - 1)], k = (((performance.now() - t0) / a.period) + a.phase) % 2; return k < 1 ? k : 2 - k; }; // 0..1..0 sweep
+  const frame = () => { mk.style.left = (pos() * 100) + '%'; raf = requestAnimationFrame(frame); };
+  paintArrows(); if (done.length < A.length) raf = requestAnimationFrame(frame); else { fire.disabled = true; fire.textContent = '다섯 발 끝!'; }
+  fire.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); if (done.length >= A.length) return;
+    const off = Math.abs(pos() - 0.5) * 2, ring = Math.max(0, 10 - Math.floor(off * 11)); // 1.0 = edge
+    done.push(ring); net.send({ t: 'arrow', ring }); buzz(ring >= 9 ? [20, 30, 20] : 15); UI.sfx(ring >= 8 ? 'ok' : 'tap');
+    bow.insertAdjacentHTML('beforeend', `<i class="hit" style="left:${mk.style.left}"></i>`);
+    $('#hn').textContent = ring === 10 ? '텐! 정중앙이에요!' : ring >= 8 ? `${ring}점, 좋아요!` : ring >= 5 ? `${ring}점. 다음엔 더 가운데로!` : `${ring}점… 숨 고르고 다시!`;
+    $('#hv').textContent = `${done.reduce((a, b) => a + b, 0)}점`; paintArrows(); t0 = performance.now();
+    if (done.length >= A.length) { cancelAnimationFrame(raf); fire.disabled = true; fire.textContent = '다섯 발 끝!'; }
+  });
+  runClock();
+}
 function stopGame() {
   const { target, tries } = S.content; const recs = []; let t0 = 0;
   V.innerHTML = hud('기록 없음') + `<div class="stopg"><div class="sw2">${UI.stopwatch('sw2')}<b id="sv">${(target / 1000).toFixed(2)}</b></div><p class="hint" id="hn">시작을 누르고, 5초가 됐다 싶을 때 멈춰요</p><button class="btn cta big" id="sb">시작</button><p class="recs soft" id="recs">기회 ${tries}번</p></div>`;
@@ -409,9 +440,9 @@ function standWith(place) { return `<div class="stand">${ava(S.pack === 'event' 
 function resultScreen() {
   const r = S.lastResult, mine = r && r.mine;
   if (!mine || mine.place === null) return waitScreen('이번엔 쉬었어요. 다음엔 같이 해요!', '큰 화면을 봐 주세요');
-  const words = ['우리가 1등!', '아주 잘했어요!', '멋져요, 3등!'];
-  V.innerHTML = `<div class="center res">${standWith(mine.place)}<div class="place" style="text-decoration-color:${S.team.color}">${mine.place + 1}등</div><h2 class="display">${mine.place < 3 ? words[mine.place] : '끝까지 잘했어요!'}</h2>
-    <div class="panel card2"><p class="ring">+${mine.points}점 · 지금 ${S.team.score}점</p><p class="soft" style="margin-top:4px">${esc(r.title)} · ${r.count}팀 중 ${mine.place + 1}등 · ${mine.value}${r.unit === 'ms' ? 'ms' : r.unit}</p>${r.together ? `<p class="together">모든 탐험대가 끝까지 해냈어요! 다 함께 보너스 +2</p>` : ''}</div></div>`;
+  const words = S.mode === 'olympic' ? ['금메달!', '은메달!', '동메달!'] : ['우리가 1등!', '아주 잘했어요!', '멋져요, 3등!'];
+  V.innerHTML = `<div class="center res">${standWith(mine.place)}<div class="place" style="text-decoration-color:${S.team.color}">${mine.place + 1}등</div><h2 class="display">${mine.place < 3 ? words[mine.place] : S.mode === 'olympic' ? '완주! 다음 종목을 노려요' : '끝까지 잘했어요!'}</h2>
+    <div class="panel card2"><p class="ring">+${mine.points}점 · 지금 ${S.team.score}점</p><p class="soft" style="margin-top:4px">${esc(r.title)} · ${r.count}팀 중 ${mine.place + 1}등 · ${mine.value}${r.unit === 'ms' ? 'ms' : r.unit}</p>${myMedals()}${r.together ? `<p class="together">모든 탐험대가 끝까지 해냈어요! 다 함께 보너스 +2</p>` : ''}</div></div>`;
   buzz(mine.place === 0 ? [40, 60, 40, 60, 120] : 30);
 }
 function finalScreen() {

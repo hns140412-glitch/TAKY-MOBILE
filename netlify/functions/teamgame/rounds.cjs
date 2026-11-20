@@ -253,8 +253,25 @@ const ROUNDS = [
   { id: 'food', family: 'brain', pack: 'event', title: '점심 메뉴 초성', how: '초성과 힌트를 보고 음식 이름을 골라요', kind: 'quiz', seconds: 30, unit: '개' },
 ];
 
+// ---- Olympic mode (company pack, added 2026-11-20): a fixed 8-event programme with medals.
+// Each event reuses a tested mechanic (base) under a sport name; archery is new (kind 'arrows').
+const OLYMPIC = [
+  { id: 'o_sprint', base: 'alt', family: 'body', title: '100m 달리기', how: '왼발·오른발 버튼을 번갈아 눌러 결승선까지! 같은 발 두 번은 무효', kind: 'count', input: 'alt', seconds: 12, unit: '걸음' },
+  { id: 'o_lift', base: 'tap', family: 'body', title: '역도', how: '바벨을 들어 올리듯 버튼을 힘껏 연타해요. 팀원끼리 손을 바꿔도 돼요', kind: 'count', seconds: 10, unit: '번' },
+  { id: 'o_archery', base: 'archery', family: 'react', title: '양궁', how: '움직이는 조준점이 과녁 한가운데 올 때 쏘세요. 다섯 발 합계 점수', kind: 'arrows', input: 'archery', seconds: 35, unit: '점' },
+  { id: 'o_shoot', base: 'react', family: 'react', title: '사격', how: '표적이 초록으로 바뀌는 순간 방아쇠! 먼저 쏘면 다시. 평균 반응 시간 대결', kind: 'react', seconds: 25, unit: 'ms', better: 'low' },
+  { id: 'o_fence', base: 'mixarrow', family: 'rule', title: '펜싱', how: '"찌르기!"면 화살표 쪽, "피하기!"면 반대쪽을 눌러요', kind: 'quiz', seconds: 25, unit: '개' },
+  { id: 'o_gym', base: 'memory', family: 'puzzle', title: '리듬체조', how: '불빛 동작 순서를 기억해 그대로 따라 눌러요. 맞히면 한 동작씩 길어져요', kind: 'level', seconds: 40, unit: '단계' },
+  { id: 'o_curling', base: 'stop', family: 'react', title: '컬링', how: '스톤을 밀고(시작) 마음속으로 5초를 센 뒤 멈춰요. 5.00초에 가까울수록 하우스 중앙!', kind: 'timing', seconds: 30, unit: 'ms 차이', better: 'low' },
+  { id: 'o_relay', base: 'shake', family: 'body', title: '수영 계주', how: '팀원이 차례로 폰을 흔들어 물살을 갈라요 (흔들기가 안 되면 버튼)', kind: 'count', input: 'shake', seconds: 12, unit: '번' },
+].map((d) => ({ ...d, pack: 'olympic' }));
+const baseOf = (id) => { const d = OLYMPIC.find((x) => x.id === id); return d ? d.base : id; };
+
 function buildContent(roundId, seed) {
   const r = rng(seed);
+  if (roundId === 'o_fence') { const out = []; for (let i = 0; i < 40; i++) { const left = r() < 0.5, hit = r() < 0.5; out.push({ prompt: { big: left ? '←' : '→', small: hit ? '찌르기!' : '피하기!', ink: hit ? '#E5484D' : '#3E7BFA' }, choices: ['←', '→'], answer: (left === hit) ? 0 : 1 }); } return out; }
+  if (roundId === 'o_archery') { const out = []; for (let i = 0; i < 5; i++) out.push({ period: Math.round(1700 - i * 230 + r() * 120), phase: r() }); return out; } // one sweep speed per arrow, faster each time
+  roundId = baseOf(roundId);
   switch (roundId) {
     case 'chosung': return choiceQuiz(WORDS, r, 20, (w) => ({ big: chosungOf(w[0]), small: w[1] }), (w) => w[0]);
     case 'english': return choiceQuiz(ENGLISH, r, 20, (w) => ({ big: w[0], small: '무슨 뜻일까요?' }), (w) => w[1]);
@@ -436,4 +453,4 @@ function placePoints(place, pack) {
 // The same mechanic gets its own name and wording in the company pack.
 function viewOf(def, pack) { return pack === 'event' && def.ev ? { ...def, title: def.ev[0], how: def.ev[1] } : def; }
 
-module.exports = { FAMILIES, ROUNDS, buildContent, placePoints, chosungOf, viewOf };
+module.exports = { FAMILIES, ROUNDS, OLYMPIC, buildContent, placePoints, chosungOf, viewOf };
