@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import R from './rounds.cjs';
 
-const { FAMILIES, ROUNDS, OLYMPIC, buildContent, placePoints, viewOf } = R;
+const { FAMILIES, ROUNDS, OLYMPIC, SPORTS, MODES, buildContent, placePoints, viewOf } = R;
 const OPENING_MS = 14000; // olympic opening parade on the big screen
 export const MAX_TEAMS = 16;
 export const INTRO_MS = 5000;
@@ -34,8 +34,8 @@ const K = {
   seen: (c, t) => `seen/${c}/${t}`,
 };
 
-const roomRounds = (room) => (room.mode === 'olympic' ? OLYMPIC : ROUNDS.filter((r) => r.pack === 'both' || r.pack === room.pack).map((d) => viewOf(d, room.pack)));
-const defOf = (rid, pack) => { const o = OLYMPIC.find((x) => x.id === rid); if (o) return o; const d = ROUNDS.find((x) => x.id === rid); return d && viewOf(d, pack); };
+const roomRounds = (room) => (MODES[room.mode] || ROUNDS.filter((r) => r.pack === 'both' || r.pack === room.pack).map((d) => viewOf(d, room.pack)));
+const defOf = (rid, pack) => { const o = OLYMPIC.find((x) => x.id === rid) || SPORTS.find((x) => x.id === rid); if (o) return o; const d = ROUNDS.find((x) => x.id === rid); return d && viewOf(d, pack); };
 // Medal table: gold/silver/bronze from each event's places (ties share a medal). Olympic order: gold, then silver, then bronze.
 function medalsOf(room) {
   const m = Object.fromEntries(room.teams.map((t) => [t.id, { g: 0, s: 0, b: 0 }]));
@@ -115,10 +115,10 @@ function asSeen(room, now) {
 }
 
 export async function createRoom(kv, packIn, now = Date.now()) {
-  const olympic = packIn === 'olympic', pack = olympic || packIn === 'event' ? 'event' : 'learn';
+  const mode = packIn === 'olympic' || packIn === 'sports' ? packIn : null, pack = packIn === 'olympic' || packIn === 'event' ? 'event' : 'learn';
   for (let i = 0; i < 20; i++) {
     const code = String(1000 + crypto.randomInt(0, 9000));
-    const room = { code, hostKey: id(16), pack, theme: pack === 'event' ? 'stage' : 'island', createdAt: now, teams: [], kicked: [], phase: 'lobby', roundIdx: -1, round: null, history: [], revealStep: 0, draws: [], draw: null, ...(olympic ? { mode: 'olympic' } : {}) };
+    const room = { code, hostKey: id(16), pack, theme: pack === 'event' ? 'stage' : 'island', createdAt: now, teams: [], kicked: [], phase: 'lobby', roundIdx: -1, round: null, history: [], revealStep: 0, draws: [], draw: null, ...(mode ? { mode } : {}) };
     if (await loadRoom(kv, code, now)) continue;
     await kv.put(K.room(code), room);
     return { code, hostKey: room.hostKey };
@@ -146,7 +146,7 @@ async function hostState(kv, room, now) {
   const [seen, metrics] = await Promise.all([readSeen(kv, room), room.round ? readMetrics(kv, room) : {}]);
   return {
     t: 'state', code: room.code, pack: room.pack, theme: room.theme, phase: room.phase, teams: publicTeams(room, seen, now),
-    mode: room.mode || null, medals: room.mode === 'olympic' ? medalsOf(room) : null, openingEnds: room.phase === 'opening' ? room.openingEnds : null, openingDone: !!room.openingDone,
+    mode: room.mode || null, medals: room.mode ? medalsOf(room) : null, openingEnds: room.phase === 'opening' ? room.openingEnds : null, openingDone: !!room.openingDone,
     rounds: roomRounds(room).map((d) => ({ id: d.id, base: d.base || d.id, title: d.title, how: d.how, seconds: d.seconds, family: d.family, familyName: FAMILIES[d.family] })),
     played: room.history.map((h) => h.id), round: roundMeta(room), live: liveScores(room, metrics),
     lastResult: room.history[room.history.length - 1] || null, revealStep: room.revealStep, draw: room.draw || null, draws: (room.draws || []).length, now,
@@ -159,7 +159,7 @@ async function playerState(kv, room, teamId, now) {
   const prog = r ? await kv.get(K.metric(room.code, r.seed, teamId)) : null;
   return {
     t: 'state', code: room.code, theme: room.theme, phase: room.phase, team: team && { id: team.id, name: team.name, color: team.color, score: team.score, crew: team.crew }, pack: room.pack,
-    teamCount: room.teams.length, round: roundMeta(room), mode: room.mode || null, medals: room.mode === 'olympic' ? medalsOf(room)[teamId] || null : null, eventNo: room.history.length, eventCount: room.mode === 'olympic' ? OLYMPIC.length : null,
+    teamCount: room.teams.length, round: roundMeta(room), mode: room.mode || null, medals: room.mode ? medalsOf(room)[teamId] || null : null, eventNo: room.history.length, eventCount: room.mode ? MODES[room.mode].length : null,
     content: r && room.phase !== 'lobby' ? r.content : null,
     progress: prog ? prog.data : null,
     lastResult: last ? { id: last.id, title: last.title, unit: last.unit, mine: last.rows.find((x) => x.teamId === teamId) || null, count: last.rows.length, together: !!last.together } : null,
@@ -211,6 +211,13 @@ function praiseFor(room, team) {
     if (m.s || m.b) return '시상대에 오른 팀';
     return '끝까지 완주한 팀 · 올림픽 정신 상';
   }
+  if (room.mode === 'sports') { // gentle: name the event it shone in; every team gets an award
+    const best = room.history.map((h) => ({ t: h.title, p: (h.rows.find((x) => x.teamId === team.id) || {}).place })).filter((x) => x.p !== null && x.p !== undefined).sort((a, b) => a.p - b.p)[0];
+    const ribbons = room.history.filter((h) => h.rows.some((x) => x.teamId === team.id && x.place !== null && x.place < 3)).length;
+    if (best && best.p === 0) return `${best.t} 1등 · 리본 ${ribbons}개`;
+    if (ribbons) return `리본 ${ribbons}개 · ${best.t}에서 힘을 낸 팀`;
+    return '끝까지 달린 팀 · 씩씩상';
+  }
   const entries = Object.entries(team.best || {}).filter(([, p]) => p !== null);
   if (!entries.length) return room.pack === 'event' ? '끝까지 함께한 팀' : '끝까지 함께 걸은 탐험대';
   const top = Math.min(...entries.map(([, p]) => p));
@@ -228,7 +235,7 @@ function praiseFor(room, team) {
 function onHost(room, msg, metricsP, now) {
   const ch = { changed: true };
   switch (msg.t) {
-    case 'opening': if (room.mode === 'olympic' && room.phase === 'lobby') { room.phase = 'opening'; room.openingEnds = now + OPENING_MS; return ch; } return null;
+    case 'opening': if (room.mode && room.phase === 'lobby') { room.phase = 'opening'; room.openingEnds = now + OPENING_MS; return ch; } return null;
     case 'start': return (room.phase === 'lobby' || room.phase === 'result') && startRound(room, msg.round, now) ? ch : null;
     case 'endNow': if (room.phase === 'play' || room.phase === 'intro') return metricsP().then((m) => { endRound(room, m, now); return ch; }); return null;
     case 'toLobby': if (room.phase === 'result' || room.phase === 'final') { room.revealStep = 0; room.phase = 'lobby'; return ch; } return null;

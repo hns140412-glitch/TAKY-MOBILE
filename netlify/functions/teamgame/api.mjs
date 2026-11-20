@@ -1,5 +1,5 @@
 // HTTP surface of the team game: Web Request -> Response. Shared by the Netlify Function and the local dev server.
-//   POST room?pack=learn|event|olympic       -> { code, hostKey }
+//   POST room?pack=learn|event|olympic|sports       -> { code, hostKey }
 //   POST send  { auth, msg }          -> { msgs: [...] }
 //   POST poll  { auth }               -> { msgs: [...] }
 //   GET  final?r=CODE&k=HOSTKEY       -> [...]

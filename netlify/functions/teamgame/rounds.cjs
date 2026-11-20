@@ -265,12 +265,25 @@ const OLYMPIC = [
   { id: 'o_curling', base: 'stop', family: 'react', title: '컬링', how: '스톤을 밀고(시작) 마음속으로 5초를 센 뒤 멈춰요. 5.00초에 가까울수록 하우스 중앙!', kind: 'timing', seconds: 30, unit: 'ms 차이', better: 'low' },
   { id: 'o_relay', base: 'shake', family: 'body', title: '수영 계주', how: '팀원이 차례로 폰을 흔들어 물살을 갈라요 (흔들기가 안 되면 버튼)', kind: 'count', input: 'shake', seconds: 12, unit: '번' },
 ].map((d) => ({ ...d, pack: 'olympic' }));
-const baseOf = (id) => { const d = OLYMPIC.find((x) => x.id === id); return d ? d.base : id; };
+// ---- Family sports day (learn pack, added 2026-11-20): 8 events in programme order, relay last.
+// Same tested mechanics under school sports-day names, with three learning events mixed in.
+const SPORTS = [
+  { id: 's_bag', base: 'archery', family: 'react', title: '콩주머니 던지기', how: '움직이는 바구니가 한가운데 올 때 던져요! 콩주머니 다섯 개, 들어간 만큼 점수', kind: 'arrows', input: 'archery', seconds: 35, unit: '점' },
+  { id: 's_hunt', base: 'chosung', family: 'brain', title: '초성 보물찾기', how: '보물 쪽지의 초성과 힌트를 보고 숨은 낱말을 찾아요', kind: 'quiz', seconds: 35, unit: '개' },
+  { id: 's_tug', base: 'shake', family: 'body', title: '줄다리기', how: '영차영차! 폰을 힘껏 흔들어 줄을 당겨요 (흔들기가 안 되면 버튼)', kind: 'count', input: 'shake', seconds: 12, unit: '번' },
+  { id: 's_dance', base: 'memory', family: 'puzzle', title: '꼭두각시 춤', how: '반짝이는 춤 동작 순서를 기억해 그대로 따라 해요. 맞히면 한 동작씩 길어져요', kind: 'level', seconds: 40, unit: '단계' },
+  { id: 's_ox', base: 'animalox', family: 'brain', title: 'OX 퀴즈 달리기', how: '동물 이야기가 맞으면 O, 틀리면 X 쪽으로 달려요', kind: 'quiz', seconds: 30, unit: '개' },
+  { id: 's_math', base: 'math', family: 'brain', title: '셈 장애물 달리기', how: '장애물마다 셈 문제! 맞혀야 넘어가요', kind: 'quiz', seconds: 35, unit: '개' },
+  { id: 's_pop', base: 'tap', family: 'body', title: '박 터뜨리기', how: '모두 함께 콩주머니를 던지듯 버튼을 연타해 박을 터뜨려요', kind: 'count', seconds: 10, unit: '번' },
+  { id: 's_relay', base: 'alt', family: 'body', title: '이어달리기', how: '왼발·오른발을 번갈아 눌러 달려요. 팀원끼리 바통 넘기듯 폰을 넘겨도 돼요', kind: 'count', input: 'alt', seconds: 15, unit: '걸음' },
+].map((d) => ({ ...d, pack: 'sports' }));
+const MODES = { olympic: OLYMPIC, sports: SPORTS };
+const baseOf = (id) => { const d = OLYMPIC.find((x) => x.id === id) || SPORTS.find((x) => x.id === id); return d ? d.base : id; };
 
 function buildContent(roundId, seed) {
   const r = rng(seed);
   if (roundId === 'o_fence') { const out = []; for (let i = 0; i < 40; i++) { const left = r() < 0.5, hit = r() < 0.5; out.push({ prompt: { big: left ? '←' : '→', small: hit ? '찌르기!' : '피하기!', ink: hit ? '#E5484D' : '#3E7BFA' }, choices: ['←', '→'], answer: (left === hit) ? 0 : 1 }); } return out; }
-  if (roundId === 'o_archery') { const out = []; for (let i = 0; i < 5; i++) out.push({ period: Math.round(1700 - i * 230 + r() * 120), phase: r() }); return out; } // one sweep speed per arrow, faster each time
+  if (roundId === 'o_archery' || roundId === 's_bag') { const out = []; for (let i = 0; i < 5; i++) out.push({ period: Math.round(1700 - i * 230 + r() * 120), phase: r() }); return out; } // one sweep speed per arrow, faster each time
   roundId = baseOf(roundId);
   switch (roundId) {
     case 'chosung': return choiceQuiz(WORDS, r, 20, (w) => ({ big: chosungOf(w[0]), small: w[1] }), (w) => w[0]);
@@ -453,4 +466,4 @@ function placePoints(place, pack) {
 // The same mechanic gets its own name and wording in the company pack.
 function viewOf(def, pack) { return pack === 'event' && def.ev ? { ...def, title: def.ev[0], how: def.ev[1] } : def; }
 
-module.exports = { FAMILIES, ROUNDS, OLYMPIC, buildContent, placePoints, chosungOf, viewOf };
+module.exports = { FAMILIES, ROUNDS, OLYMPIC, SPORTS, MODES, buildContent, placePoints, chosungOf, viewOf };

@@ -56,6 +56,15 @@
     o_gym: S('<circle cx="24" cy="10" r="4" fill="var(--panel-solid)"/><path d="M24 14v14l-8 12M24 28l8 12M12 18l12 4 12-4"/><path d="M6 30c6-10 30-16 36-4" stroke="var(--accent-2)" stroke-dasharray="3 4"/>'),
     o_curling: S('<ellipse cx="24" cy="32" rx="16" ry="8" fill="var(--panel-solid)"/><path d="M8 32v-4c0-4 7-8 16-8s16 4 16 8v4"/><path d="M20 20v-6h12" stroke="var(--accent-2)"/>'),
     o_relay: S('<circle cx="16" cy="14" r="4" fill="var(--panel-solid)"/><path d="M20 18l10 6M4 30c4-3 8-3 12 0s8 3 12 0 8-3 12 0 6 2 8 1" stroke="var(--accent-2)"/><path d="M4 38c4-3 8-3 12 0s8 3 12 0 8-3 12 0 6 2 8 1" stroke="var(--accent-2)" opacity=".6"/><path d="M16 18l-6 8"/>'),
+    s_flags: S('<path d="M4 10c10 6 30 6 40 0"/><path d="M8 12l2 8 4-7M18 14l2 8 3-8M28 14l2 8 3-8M38 12l1 8 4-7" fill="var(--gold)" stroke="var(--accent-2)"/><path d="M8 30h32v12H8z" fill="var(--panel-solid)"/><path d="M14 36h20" stroke="var(--accent-2)"/>'),
+    s_bag: S('<path d="M8 22h32l-4 20H12z" fill="var(--panel-solid)"/><path d="M8 22l4-4h24l4 4M14 30h20M15 36h18" stroke="var(--accent-2)"/><path d="M20 4c4 0 6 3 4 7s-6 3-6 0 0-7 2-7z" fill="var(--bad)" stroke="var(--bad)"/><path d="M30 6c3 1 4 4 2 6s-5 1-5-1 1-5 3-5z" fill="var(--gold)" stroke="var(--gold)"/>'),
+    s_hunt: S('<path d="M8 10h26l6 6v24H8z" fill="var(--panel-solid)"/><path d="M34 10v6h6"/><path d="M15 22h14M15 29h10" stroke="var(--accent-2)"/><path d="M33 31l4 4m-1-7a5 5 0 1 1-10 0 5 5 0 0 1 10 0z" stroke="var(--accent-2)"/>'),
+    s_tug: S('<path d="M4 26c8-3 32-3 40 0" stroke="var(--accent-2)" stroke-width="3"/><circle cx="10" cy="12" r="4" fill="var(--panel-solid)"/><path d="M10 16l-2 9 6 3-3 12M8 25l-4 8"/><circle cx="38" cy="12" r="4" fill="var(--panel-solid)"/><path d="M38 16l2 9-6 3 3 12M40 25l4 8"/><path d="M24 20v12" stroke="var(--bad)" stroke-width="3"/>'),
+    s_dance: S('<circle cx="24" cy="9" r="5" fill="var(--panel-solid)"/><path d="M24 14v14M24 28l-7 13M24 28l7 13M10 14l14 6 14-10"/><path d="M38 6l3 3M42 14h4M6 8l-3-2" stroke="var(--accent-2)"/>'),
+    s_ox: S('<circle cx="14" cy="24" r="9" fill="var(--panel-solid)" stroke="var(--good)"/><path d="M28 15l14 18M42 15L28 33" stroke="var(--bad)" stroke-width="3"/><path d="M4 42h40" stroke-dasharray="4 4"/>'),
+    s_math: S('<rect x="4" y="30" width="12" height="12" rx="2" fill="var(--panel-solid)"/><rect x="32" y="30" width="12" height="12" rx="2" fill="var(--panel-solid)"/><path d="M8 36h4M10 34v4M36 36h4" stroke="var(--accent-2)"/><path d="M6 24c6-14 30-14 36 0" stroke-dasharray="3 4"/><circle cx="24" cy="9" r="4" fill="var(--gold)" stroke="var(--gold)"/>'),
+    s_pop: S('<circle cx="24" cy="22" r="14" fill="var(--panel-solid)"/><path d="M10 22h28M24 8v28" stroke="var(--accent-2)"/><path d="M24 4V2M8 8L6 6M40 8l2-2M4 22H2M44 22h2" stroke="var(--gold)"/><path d="M18 40l6 4 6-4" stroke="var(--bad)"/>'),
+    s_relay: S('<circle cx="14" cy="9" r="4" fill="var(--panel-solid)"/><path d="M14 13l-4 11 6 4-2 12M10 24l-6 2M15 17l8 4"/><path d="M23 21l8-2" stroke="var(--gold)" stroke-width="4"/><circle cx="36" cy="11" r="4" fill="var(--panel-solid)"/><path d="M36 15l-2 10 5 4-1 11M31 19l3 0"/>'),
     gift: S('<rect x="7" y="20" width="34" height="22" rx="3" fill="var(--panel-solid)"/><rect x="5" y="13" width="38" height="8" rx="2" fill="var(--gold)" stroke="var(--gold)"/><path d="M24 13v29" stroke="var(--bad)" stroke-width="3"/><path d="M24 13c-4-8-14-6-10 0M24 13c4-8 14-6 10 0"/>'),
     flag: S('<path d="M12 43V6"/><path d="M12 7h24l-6 7 6 7H12" fill="var(--gold)" stroke="var(--gold)"/>'),
   };
@@ -107,7 +116,7 @@
     idiom: ['작심 ○○', '', ['삼일', '이조', '서답', '무환'], 0], abbr: ['ASAP', '', ['가능한 한 빨리', '참고로', '연구 개발', '자주 묻는 질문'], 0],
   };
   function demo(id, color, base) {
-    if (base && base !== id && !DEMO_Q[id] && id !== 'o_archery') id = base;
+    const bag = id === 's_bag'; if (base === 'archery') id = 'o_archery'; else if (base && base !== id && !DEMO_Q[id]) id = base;
     const c = color || 'var(--accent-2)';
     let body = '';
     if (id === 'tap' || id === 'shake') body = `<div class="dm-tap ${id}" style="background:${c};color:${inkOn(color || '#F08A3C')}">${id === 'shake' ? '흔들어요!' : '눌러요!'}<i class="dm-finger">${ICONS.tap}</i></div>`;
@@ -116,7 +125,7 @@
     else if (id === 'memory') body = `<div class="dm-hint">잘 보고 따라 눌러요</div><div class="dm-grid g9">${Array.from({ length: 9 }, (_, i) => `<span class="${[4, 0, 8].includes(i) ? 'lit l' + [4, 0, 8].indexOf(i) : ''}"></span>`).join('')}</div>`;
     else if (id === 'alt') body = `<div class="dm-hint">번갈아 콩콩!</div><div class="dm-feet"><span class="a">왼발</span><span class="b">오른발</span></div>`;
     else if (id === 'stop') body = `<div class="dm-stop">${stopwatch('dmsw')}<b>5.00?</b></div><div class="dm-btn">멈춰!</div>`;
-    else if (id === 'o_archery') body = `<div class="dm-hint">가운데 올 때 쏘세요!</div><div class="dm-bow"><i class="tg"></i><i class="mk"></i></div><div class="dm-btn">쏘기!</div>`;
+    else if (id === 'o_archery') body = `<div class="dm-hint">가운데 올 때 ${bag ? '던져요' : '쏘세요'}!</div><div class="dm-bow"><i class="tg"></i><i class="mk"></i></div><div class="dm-btn">${bag ? '던지기!' : '쏘기!'}</div>`;
     else if (id === 'react') body = `<div class="dm-react"><span class="w">기다려요…</span><span class="g">지금!</span></div>`;
     return `<div class="demo" aria-label="폰에서 하는 방법"><div class="dm-phone"><div class="dm-notch"></div>${body}</div><p class="dm-cap">폰에서는 이렇게!</p></div>`;
   }

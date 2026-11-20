@@ -174,4 +174,33 @@ assert.equal((await poll(kv, { code: '12', hostKey: 'x' }, t))[0].code, 'NO_ROOM
   assert.ok(orows[0].praise.includes('금메달'), 'olympic praise names the gold events'); assert.equal(orows[2].praise, '시상대에 오른 팀');
 }
 
+// family sports day: learn pack, fixed programme (relay last), opening, gentle score order, ribbons, no draw
+{
+  const sp = await createRoom(kv, 'sports', t), sh = { code: sp.code, hostKey: sp.hostKey };
+  let on = true; const loop = (async () => { while (on) { await poll(kv, sh, t + 100); await sleep(40); } })();
+  const sj = await Promise.all(['A', 'B', 'C'].map((name) => send(kv, { code: sp.code }, { t: 'join', code: sp.code, name }, t)));
+  on = false; await loop;
+  const sa = sj.map((m) => ({ code: sp.code, teamId: m[0].teamId, token: m[0].token }));
+  let ss = (await poll(kv, sh, t))[0];
+  assert.equal(ss.mode, 'sports'); assert.equal(ss.pack, 'learn'); assert.equal(ss.rounds.length, 8);
+  assert.equal(ss.rounds[7].id, 's_relay', 'relay closes the day');
+  assert.equal((await send(kv, sh, { t: 'start', round: 'arrow' }, t))[0].round, null, 'company rounds are not in the sports day');
+  ss = (await send(kv, sh, { t: 'opening' }, t))[0]; assert.equal(ss.phase, 'opening');
+  ss = (await poll(kv, sh, t + 15_000))[0]; assert.equal(ss.phase, 'lobby');
+  let T = t + 20_000;
+  await send(kv, sh, { t: 'start', round: 's_bag' }, T); T += INTRO_MS + 100;
+  for (const ring of [10, 10, 10]) await send(kv, sa[0], { t: 'arrow', ring }, T);
+  await send(kv, sa[1], { t: 'arrow', ring: 4 }, T); await send(kv, sa[2], { t: 'arrow', ring: 2 }, T);
+  ss = (await poll(kv, sh, T + 40_000))[0]; ss = (await poll(kv, sh, T + 40_100))[0];
+  assert.equal(ss.phase, 'result'); assert.equal(ss.lastResult.rows[0].value, 30);
+  assert.equal(ss.lastResult.together, true, 'family together bonus still applies');
+  assert.equal(ss.medals[sa[0].teamId].g, 1);
+  const me = (await poll(kv, sa[2], T + 40_200))[0]; assert.equal(me.eventCount, 8); assert.deepEqual(me.medals, { g: 0, s: 0, b: 1 });
+  await send(kv, sh, { t: 'final' }, T + 40_300);
+  const srows = await final(kv, sp.code, sp.hostKey, T + 40_300);
+  assert.equal(srows[0].name, 'A'); assert.ok(srows[0].praise.startsWith('콩주머니 던지기 1등'));
+  assert.ok(srows.every((r) => r.praise), 'every team gets an award line');
+  assert.equal((await send(kv, sh, { t: 'draw' }, T + 40_400))[0].draw, null, 'no prize draw on sports day');
+}
+
 console.log('engine tests: PASS');
