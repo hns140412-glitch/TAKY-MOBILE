@@ -46,7 +46,7 @@
   .pack { position: relative; padding: 34px 26px 22px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr auto; align-items: start; gap: 10px; transition: transform var(--t-fast) var(--ease-out); }
   .pack:hover { transform: translateY(-3px); }
   .pack h2 { font-size: var(--fs-xl); }
-  .pack.olympic { grid-column: 1 / -1; } .pack.olympic .art { display: flex; gap: 6px; align-items: flex-end; }
+  .pack.olympic .art, .pack.sports .art { display: flex; gap: 6px; align-items: flex-end; }
   .pack p { margin-top: 8px; color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.55; }
   .pack .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
   .pack .art { display: flex; align-items: flex-end; align-self: end; margin-right: -6px; }
@@ -189,7 +189,7 @@
   .final { height: 100%; display: grid; grid-template-rows: auto 1fr auto; gap: 14px; min-height: 0; }
   .final .ttl { text-align: center; padding-top: 4px; }
   .medalboard { padding: 34px 18px 12px; min-height: 0; overflow: visible; } .medalboard .tabwrap { position: absolute; top: -18px; left: 22px; }
-  .mrows { display: grid; gap: 6px; } .mrow { display: grid; grid-template-columns: 28px 44px 1fr repeat(3, 58px); align-items: center; gap: 8px; padding: 4px 10px; border-radius: 12px; background: color-mix(in srgb, var(--panel-solid) 70%, transparent); }
+  .mrows { display: grid; gap: 6px; } .mrow { display: grid; grid-template-columns: 28px 44px 1fr repeat(3, 58px); } body[data-mode="sports"] .mrow { grid-template-columns: 28px 44px 1fr repeat(3, 58px) 72px; } .mrow .pt { font-family: var(--font-display); font-size: 20px; text-align: right; } .mrow { align-items: center; gap: 8px; padding: 4px 10px; border-radius: 12px; background: color-mix(in srgb, var(--panel-solid) 70%, transparent); }
   .mrow:first-child { box-shadow: inset 0 0 0 2px var(--gold); } .mrow.off { opacity: .55; } .mrow .rk { font-family: var(--font-display); font-size: 20px; text-align: center; } .mrow .nm { font-weight: 700; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .md { display: inline-flex; align-items: center; gap: 4px; } .md b { font-family: var(--font-display); font-size: 20px; min-width: 1ch; } .mrows .more { text-align: center; color: var(--ink-soft); }
   .opening { display: grid; grid-template-rows: auto 1fr auto auto; place-items: center; text-align: center; overflow: hidden; }
@@ -298,7 +298,9 @@ const paintMute = () => { $('#mute').style.opacity = muted ? .4 : 1; $('#mute').
 paintMute(); $('#mute').onclick = () => { muted = !muted; store.set('tg.mute', muted); setAllMuted(muted); paintMute(); };
 
 // Words change with the pack: learning = expedition story, event = plain team-game words.
-const W = (pack, mode) => mode === 'olympic'
+const W = (pack, mode) => mode === 'sports'
+  ? { team: '탐험대', teams: '모인 탐험대', round: '종목', camp: '운동회 접수', champ: '오늘의 운동회 최고 탐험대!', result: '종목 결과', go: '이 종목 시작', next: '다음 종목으로', lineup: '제자리에, 준비!', packName: '가족 운동회', empty: '탐험대마다 폰 한 대로 QR을 찍으면 대원이 운동장에 나와요' }
+  : mode === 'olympic'
   ? { team: '팀', teams: '선수단', round: '종목', camp: '선수단 등록', champ: '종합 우승!', result: '종목 결과', go: '이 종목 시작', next: '다음 종목으로', lineup: '선수 입장 완료?', packName: '송년 올림픽', empty: '팀마다 폰 한 대로 QR을 찍으면 선수단이 등록돼요' }
   : pack === 'event'
   ? { team: '팀', teams: '들어온 팀', round: '라운드', camp: '참가 접수', champ: '오늘의 우승 팀!', result: '라운드 결과', go: '이 라운드 시작', next: '다음 라운드 고르기', lineup: '모두 준비됐나요?', packName: '행사 팩', empty: '팀마다 폰 한 대로 QR을 찍어 주세요' }
@@ -318,6 +320,7 @@ function renderSetup() {
     <div class="packs">
       <button class="pack panel" data-pack="learn"><div><h2 class="display">학습 팩 · 탐험대</h2><p>초성 낱말, 영어 짝꿍, 한자 뜻 찾기처럼 배운 것을 꺼내 쓰는 미션에 몸·반응·퍼즐 놀이를 섞었어요. 팀마다 탐험 크루 대원이 함께 뛰어요.</p><div class="tags"><span class="chip">가족 거실</span><span class="chip">교실</span><span class="chip">미션 30종</span></div></div><div class="art">${crewArt}</div><span class="btn cta go">탐험 시작</span></button>
       <button class="pack panel" data-pack="event"><div><h2 class="display">행사 팩</h2><p>색깔 함정, O X 퀴즈, 초록불 반응처럼 설명 없이 바로 웃게 되는 라운드. 워크숍·모임·체육대회용.</p><div class="tags"><span class="chip">회사·단체</span><span class="chip">최대 16팀</span><span class="chip">라운드 21종</span></div></div><div class="art">${embArt}</div><span class="btn primary go">행사 열기</span></button>
+      <button class="pack panel sports" data-pack="sports"><div><h2 class="display">가족 운동회</h2><p>콩주머니 던지기, 초성 보물찾기, 줄다리기, 꼭두각시 춤, OX 퀴즈 달리기, 셈 장애물 달리기, 박 터뜨리기, 이어달리기 8종목. 개회식부터 폐회식까지 모두 함께 리본을 모아요.</p><div class="tags"><span class="chip">가족·교실</span><span class="chip">8종목</span><span class="chip">리본 모으기</span></div></div><div class="art">${UI.icon('s_flags').replace('class="ico"', 'class="ico" style="width:96px;height:96px"')}</div><span class="btn cta go">개회 준비</span></button>
       <button class="pack panel olympic" data-pack="olympic"><div><h2 class="display">송년 올림픽</h2><p>100m 달리기부터 양궁·펜싱·컬링·수영 계주까지 8종목. 개막식 입장, 종목마다 금·은·동, 메달 집계로 종합 우승을 가려요.</p><div class="tags"><span class="chip">송년회·체육대회</span><span class="chip">8종목</span><span class="chip">메달 집계</span><span class="chip">경품 추첨</span></div></div><div class="art">${[0, 1, 2].map((k) => UI.rosette(k, 64)).join('')}</div><span class="btn cta go">개막 준비</span></button>
     </div>
     <div class="themes" role="group" aria-label="테마">${THEMES.map(([k, n]) => `<button class="chip" data-theme-pick="${k}" aria-pressed="${document.documentElement.dataset.theme === k}">${n}</button>`).join('')}</div>
@@ -397,7 +400,7 @@ function trailPath(n, cols) {
 }
 function renderLobby() {
   if (!selected || !S.rounds.some((r) => r.id === selected)) selected = nextUnplayed().id;
-  const order = ['body', 'react', 'rule', 'puzzle', 'brain'], OLY = S.mode === 'olympic';
+  const order = ['body', 'react', 'rule', 'puzzle', 'brain'], OLY = !!S.mode, SPORT = S.mode === 'sports';
   const rounds = OLY ? [...S.rounds] : [...S.rounds].sort((a, b) => order.indexOf(a.family) - order.indexOf(b.family));
   const sz = crewSize(S.teams.length), cols = OLY ? 4 : rounds.length > 24 ? (innerWidth >= 1600 ? 8 : 6) : rounds.length > 15 ? 6 : 5, dense = !OLY && rounds.length > 24;
   const teamsHtml = S.teams.length ? S.teams.map((t, i) => `<div class="team ${i % 2 ? 'back' : ''} ${t.online ? '' : 'off'}" title="${esc(t.name)}">${ava(t, i % 2 ? Math.round(sz * .88) : sz)}<span class="flag" style="background:${t.color};color:${UI.inkOn(t.color)}">${esc(t.name)} <small>${t.online ? t.score + '점' : '연결 끊김'}</small></span></div>`).join('') : `<p class="empty"><span class="hand-note">아직 아무도 안 왔어요</span>${w.empty}</p>`;
@@ -413,11 +416,11 @@ function renderLobby() {
       </div>
     </div>
     <div class="right">
-      <div class="panel missions"><div class="tabwrap"><span class="banner">${UI.icon(OLY ? 'o_torch' : 'order')}${OLY ? '올림픽 종목표' : `오늘의 ${w.round} 지도`}</span></div><span class="sub">${w.round} ${S.played.length}/${S.rounds.length} 완료 · 눌러서 고르고 <kbd style="font:inherit">Space</kbd></span>
+      <div class="panel missions"><div class="tabwrap"><span class="banner">${UI.icon(SPORT ? 's_flags' : OLY ? 'o_torch' : 'order')}${SPORT ? '운동회 순서표' : OLY ? '올림픽 종목표' : `오늘의 ${w.round} 지도`}</span></div><span class="sub">${w.round} ${S.played.length}/${S.rounds.length} 완료 · 눌러서 고르고 <kbd style="font:inherit">Space</kbd></span>
         <div class="trail">${trailPath(rounds.length, cols)}<div class="rgrid ${dense ? 'dense' : ''}" style="grid-template-columns:repeat(${cols},1fr)">${rounds.map((r, i) => `<button class="rcard ${S.played.includes(r.id) ? 'done' : ''}" data-r="${r.id}" aria-pressed="${selected === r.id}" title="${esc(r.how)}"><span class="no">${i + 1}</span><span class="itile">${UI.icon(r.id)}</span><span><b>${esc(r.title)}</b><span class="m">${OLY ? `제${i + 1}종목` : esc(r.familyName)} · ${r.seconds}초</span></span></button>`).join('')}</div></div></div>
       ${OLY ? medalBoard() : ''}<div class="camp ${OLY ? 'hidden' : ''}"><div class="hd"><span class="wrap-banner"><span class="banner">${w.teams} ${S.teams.length}</span></span>${S.teams.length ? '' : '<span class="chip">앱 설치·가입 없이 · 팀당 폰 1대</span>'}</div><div class="crowd">${teamsHtml}</div></div>
       <div class="bar">
-        ${OLY && !S.openingDone && !S.played.length ? `<button class="btn primary" id="open" ${S.teams.length ? '' : 'disabled'}>${UI.icon('o_torch').replace('class="ico"', 'class="ico" style="width:24px;height:24px"')}개막식</button>` : ''}
+        ${OLY && !S.openingDone && !S.played.length ? `<button class="btn primary" id="open" ${S.teams.length ? '' : 'disabled'}>${UI.icon(SPORT ? 's_flags' : 'o_torch').replace('class="ico"', 'class="ico" style="width:24px;height:24px"')}개막식</button>` : ''}
         <button class="btn cta" id="go" ${S.teams.length ? '' : 'disabled'}>${w.go}</button>
         <button class="btn primary" id="fin" ${S.played.length ? '' : 'disabled'}>최종 발표</button>
         <span class="sp"></span>
@@ -438,20 +441,21 @@ function renderLobby() {
 // ---------- olympic: medal board + opening parade ----------
 function medalRows() {
   const M = S.medals || {}, m = (t) => M[t.id] || { g: 0, s: 0, b: 0 };
+  if (S.mode === 'sports') return S.teams.slice().sort((a, b) => b.score - a.score || m(b).g - m(a).g).map((t) => ({ ...t, md: m(t) }));
   return S.teams.slice().sort((a, b) => m(b).g - m(a).g || m(b).s - m(a).s || m(b).b - m(a).b || b.score - a.score).map((t) => ({ ...t, md: m(t) }));
 }
 const medalIcons = (md, size = 26) => [['g', 0], ['s', 1], ['b', 2]].map(([k, p]) => `<span class="md">${UI.rosette(p, size)}<b>${md[k]}</b></span>`).join('');
 function medalBoard() {
   const rows = medalRows(), shown = rows.slice(0, innerHeight < 900 ? 6 : 10);
-  return `<div class="panel medalboard"><div class="tabwrap"><span class="banner">메달 집계 · ${S.teams.length}팀</span></div>
-    ${rows.length ? `<div class="mrows">${shown.map((t, i) => `<div class="mrow ${t.online ? '' : 'off'}"><span class="rk">${i + 1}</span>${ava(t, 40)}<span class="nm">${esc(t.name)}</span>${medalIcons(t.md)}</div>`).join('')}${rows.length > shown.length ? `<p class="more">외 ${rows.length - shown.length}팀</p>` : ''}</div>` : `<p class="empty"><span class="hand-note">선수단을 기다리는 중</span>${w.empty}</p>`}</div>`;
+  return `<div class="panel medalboard"><div class="tabwrap"><span class="banner">${S.mode === 'sports' ? '리본 점수판' : '메달 집계'} · ${S.teams.length}팀</span></div>
+    ${rows.length ? `<div class="mrows">${shown.map((t, i) => `<div class="mrow ${t.online ? '' : 'off'}"><span class="rk">${i + 1}</span>${ava(t, 40)}<span class="nm">${esc(t.name)}</span>${medalIcons(t.md)}${S.mode === 'sports' ? `<span class="pt">${t.score}점</span>` : ''}</div>`).join('')}${rows.length > shown.length ? `<p class="more">외 ${rows.length - shown.length}팀</p>` : ''}</div>` : `<p class="empty"><span class="hand-note">${S.mode === 'sports' ? '탐험대를 기다리는 중' : '선수단을 기다리는 중'}</span>${w.empty}</p>`}</div>`;
 }
 function renderOpening() {
   clearInterval(tick);
   const teams = S.teams, per = Math.max(700, Math.min(1400, 11000 / Math.max(1, teams.length)));
   main.innerHTML = `<section class="screen opening">
-    <div class="ttl"><span class="wrap-banner"><span class="banner lg">${UI.icon('o_torch')}TAKY 송년 올림픽 개막식</span></span><p class="hand-note">선수단 입장! 큰 박수로 맞아 주세요</p></div>
-    <div class="torch">${UI.icon('o_torch')}</div>
+    <div class="ttl"><span class="wrap-banner"><span class="banner lg">${S.mode === 'sports' ? `${UI.icon('s_flags')}TAKY 가족 운동회 개회식` : `${UI.icon('o_torch')}TAKY 송년 올림픽 개막식`}</span></span><p class="hand-note">${S.mode === 'sports' ? '탐험대 입장! 손뼉 치며 맞아 주세요' : '선수단 입장! 큰 박수로 맞아 주세요'}</p></div>
+    <div class="torch">${UI.icon(S.mode === 'sports' ? 's_flags' : 'o_torch')}</div>
     <div class="parade">${teams.map((t, i) => `<div class="marcher" style="animation-delay:${(i * per) / 1000}s"><span class="pole"><span class="pflag" style="background:${t.color};color:${UI.inkOn(t.color)}">${esc(t.name)}</span></span>${ava(t, 96)}</div>`).join('')}</div>
     <p class="ocount" id="oc"></p></section>`;
   burst(0.6); UI.sfx('fanfare');
@@ -523,7 +527,7 @@ function renderResult() {
   const unit = (x) => x.value === null ? '참여 안 함' : x.value + (h.unit === 'ms' ? 'ms' : h.unit);
   main.innerHTML = `<section class="screen result">
     <div class="panel stand"><div class="tabwrap"><span class="banner">${UI.icon(h.id)}${w.result}</span></div>
-      <div class="ttl"><h2 class="display">${esc(h.title)}</h2>${S.mode === 'olympic' ? `<p class="hand-note">제${S.played.length}종목 / ${S.rounds.length}종목</p>` : ''}${h.together ? '<p class="together">모든 탐험대가 끝까지 해냈어요! 다 함께 보너스 +2점</p>' : ''}</div>
+      <div class="ttl"><h2 class="display">${esc(h.title)}</h2>${S.mode ? `<p class="hand-note">제${S.played.length}종목 / ${S.rounds.length}종목</p>` : ''}${h.together ? '<p class="together">모든 탐험대가 끝까지 해냈어요! 다 함께 보너스 +2점</p>' : ''}</div>
       <div class="podium">${order.map((x) => `<div class="pod">${ava(x, S.pack === 'event' ? [92, 76, 70][x.place] : ah[x.place])}<div class="blk" style="height:${hgt[x.place] ?? 100}px;background:${col[x.place] ?? 'var(--accent)'}">${UI.rosette(x.place, x.place === 0 ? 74 : 60)}<span class="nm">${esc(x.name)}</span><span class="val">${unit(x)} · ${S.mode === 'olympic' ? ['금', '은', '동'][x.place] + '메달' : `+${x.points}점`}</span></div></div>`).join('')}</div>
     </div>
     <div class="panel rlist">${h.rows.map((x) => `<div class="row"><div class="pl medal-b ${x.place !== null && x.place < 3 ? 'm' + x.place : 'mx'}">${x.place === null ? '–' : x.place + 1}</div><div class="av">${ava(x, 44)}</div><div class="who">${esc(x.name)}<small>${unit(x)}</small></div><div class="pt">+${x.points}</div><div class="adj"><button data-adj="${x.teamId}" data-d="-1" aria-label="${esc(x.name)} 1점 빼기">−</button><button data-adj="${x.teamId}" data-d="1" aria-label="${esc(x.name)} 1점 더하기">+</button></div></div>`).join('')}
@@ -544,9 +548,9 @@ async function renderFinal() {
   const card = (t) => done && t.place === 0
     ? `<div class="rv win ${ties > 1 ? 'tie' : ''}"><div class="ros">${UI.rosette(0, ties > 1 ? 56 : 92)}</div><div class="av">${ava(t, S.pack === 'event' ? (ties > 1 ? 96 : 130) : ties > 1 ? 120 : 170)}${CROWN}</div><div><span class="wrap-banner"><span class="banner">${ties > 1 ? '공동 1등' : '1등'}</span></span><div class="nm">${esc(t.name)}</div><div class="pr">${esc(t.praise)}</div></div><div class="sc">${S.mode === 'olympic' && t.medals ? `<span class="mset">${medalIcons(t.medals, 40)}</span>` : `${t.score}점`}</div></div>`
     : `<div class="rv"><div class="pl medal-b ${t.place < 3 ? 'm' + t.place : 'mx'}">${t.place + 1}</div><div class="av">${ava(t, S.pack === 'event' ? 52 : 64)}</div><div><div class="nm">${esc(t.name)}</div><div class="pr">${esc(t.praise)}</div></div><div class="sc">${S.mode === 'olympic' && t.medals ? `<span class="mset">${medalIcons(t.medals, 30)}</span>` : `${t.score}점`}</div></div>`;
-  main.innerHTML = `<section class="screen final"><div class="ttl"><span class="wrap-banner"><span class="banner lg">${done ? w.champ : S.revealStep === 0 ? (S.mode === 'olympic' ? '메달 시상식' : S.pack === 'event' ? '최종 발표' : '탐험 수료식') : `${n - S.revealStep}${w.team === '팀' ? '팀' : '대'} 남았어요`}</span></span>${S.revealStep === 0 ? `<br><p class="hand-note">${S.pack === 'event' ? '꼴찌부터 한 팀씩, 두근두근' : '모든 탐험대가 함께 수료해요'}</p>` : ''}</div>
+  main.innerHTML = `<section class="screen final"><div class="ttl"><span class="wrap-banner"><span class="banner lg">${done ? w.champ : S.revealStep === 0 ? (S.mode === 'olympic' ? '메달 시상식' : S.mode === 'sports' ? '운동회 폐회식' : S.pack === 'event' ? '최종 발표' : '탐험 수료식') : `${n - S.revealStep}${w.team === '팀' ? '팀' : '대'} 남았어요`}</span></span>${S.revealStep === 0 ? `<br><p class="hand-note">${S.pack === 'event' ? '꼴찌부터 한 팀씩, 두근두근' : S.mode === 'sports' ? '모든 탐험대에게 상장을 드려요' : '모든 탐험대가 함께 수료해요'}</p>` : ''}</div>
     <div class="reveal">${done && ties > 1 ? `<div class="tiebox">${shown.filter((t) => t.place === 0).map(card).join('')}</div>${shown.filter((t) => t.place !== 0).map(card).join('')}` : shown.map(card).join('')}</div>
-    <div class="bar"><button class="btn cta" id="rv" ${done ? 'disabled' : ''}>${S.pack === 'event' ? (S.revealStep === 0 ? '꼴찌부터 공개' : `다음 ${w.team} 공개`) : '탐험 수료식 시작'}</button><button class="btn" id="back">점수판으로</button>${S.pack !== 'event' ? '' : `<button class="btn primary" id="draw" ${(S.draws || 0) >= S.teams.length ? 'disabled' : ''}>${UI.icon('gift').replace('class="ico"', 'class="ico" style="width:24px;height:24px"')}경품 추첨</button>`}<span class="sp"></span><span class="kbd"><kbd>Space</kbd> 공개</span><button class="btn" id="again">처음부터 다시</button></div></section>`;
+    <div class="bar"><button class="btn cta" id="rv" ${done ? 'disabled' : ''}>${S.pack === 'event' ? (S.revealStep === 0 ? '꼴찌부터 공개' : `다음 ${w.team} 공개`) : S.mode === 'sports' ? '폐회식 시작' : '탐험 수료식 시작'}</button><button class="btn" id="back">점수판으로</button>${S.pack !== 'event' ? '' : `<button class="btn primary" id="draw" ${(S.draws || 0) >= S.teams.length ? 'disabled' : ''}>${UI.icon('gift').replace('class="ico"', 'class="ico" style="width:24px;height:24px"')}경품 추첨</button>`}<span class="sp"></span><span class="kbd"><kbd>Space</kbd> 공개</span><button class="btn" id="again">처음부터 다시</button></div></section>`;
   $('#rv').onclick = () => net.send({ t: 'reveal' });
   $('#back').onclick = () => { finalRows = null; net.send({ t: 'toLobby' }); };
   if ($('#draw')) $('#draw').onclick = () => net.send({ t: 'draw' });
