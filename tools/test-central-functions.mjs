@@ -340,4 +340,18 @@ await t('email invite: first verified sign-in binds the account; unverified emai
   assert.equal(JSON.parse([...d.files.values()].find(f => f.name === 'members.json').bytes.toString('utf8'))[2].subject, undefined);
 });
 
+await t('owner auto-admin: TAKY_ADMIN permission opens admin; other members and strangers do not', async () => {
+  const { familyAdmin } = await import('../netlify/functions/admin-session.mjs');
+  const d = fakeDrive();
+  d.seed('members.json', [
+    { provider: 'GOOGLE_OIDC', subject: '111', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'OWNER', role: 'PARENT', learning_evidence_submit_member_ids: [], permissions: ['TAKY_ADMIN'] },
+    { provider: 'GOOGLE_OIDC', subject: '777', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'KID', role: 'CHILD', learning_evidence_submit_member_ids: ['KID'] },
+  ]);
+  const o = { config, fetchImpl: d.fetchImpl, oauth2Client };
+  assert.equal(await familyAdmin('token-parent-aaaaaaaaaaaa', o), true);
+  assert.equal(await familyAdmin('token-invitee-aaaaaaaaaa', o), false);
+  assert.equal(await familyAdmin('token-stranger-aaaaaaaaaa', o), false);
+  assert.equal(await familyAdmin('token-forged-aaaaaaaaaaa', o), false);
+});
+
 console.log(`central functions: ${passed} passed`);
