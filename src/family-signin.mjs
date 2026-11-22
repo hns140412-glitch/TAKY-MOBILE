@@ -263,7 +263,7 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk,v
    return {ok:true,state:'FAMILY_SELECTION'};
   }catch{
    if(ticket===epoch){holder=null;resetView();
-    say(unregistered?'이 Google 계정은 아직 가족으로 등록되지 않았어요. 관리자가 등록하면 다시 로그인해 주세요.':!device?'가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.':ended?'이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.':'중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요.');}
+    say(unregistered?'이 Google 계정은 아직 가족 명단에 없어요. 가족 명단에 이메일을 올린 뒤 다시 로그인해 주세요.':!device?'가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.':ended?'이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.':'중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요.');}
    return {ok:false,state:!device?'CENTRAL_SESSION_REJECTED':ended?'DEVICE_SIGNIN_ENDED':'CENTRAL_LOGIN_UNAVAILABLE'};
   }
  }
