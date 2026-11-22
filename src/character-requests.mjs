@@ -51,30 +51,37 @@ export async function mountCharacterRequests(root, { runtime = globalThis.TAKY_F
   box.hidden = false;
   if (!res.ok) { status.textContent = '캐릭터 신청을 불러오지 못했어요.'; return { ok: false, state: 'UNAVAILABLE' }; }
   const reqs = res.j.requests || [];
-  status.textContent = reqs.length ? `새 캐릭터 신청 ${reqs.length}건 · 사진을 보고 캐릭터를 만든 뒤 올려서 승인해 주세요.` : '새 캐릭터 신청이 없어요.';
+  status.textContent = reqs.length ? `새 캐릭터 신청 ${reqs.length}건 · ① 사진 저장 → ② ChatGPT 등에서 캐릭터로 만들기 → ③ 완성 이미지 고르고 승인. 사진 그대로 쓰려면 '이 사진 그대로 승인'.` : '새 캐릭터 신청이 없어요.';
   for (const rq of reqs) {
     const card = document.createElement('article'); card.className = 'character-request';
     const img = document.createElement('img'); img.alt = '신청 사진'; img.className = 'character-request__photo';
-    const save = document.createElement('a'); save.textContent = '사진 저장'; save.className = 'family-member-choice'; save.download = 'taky-character-request.jpg';
-    fetchImpl(rq.photo_url).then(r => r.ok ? r.blob() : null).then(b => { if (b) { const u = URL.createObjectURL(b); img.src = u; save.href = u; } }).catch(() => {});
+    const save = document.createElement('a'); save.textContent = '① 사진 저장'; save.className = 'family-member-choice'; save.download = 'taky-character-request.jpg';
+    let srcBlob = null;
+    const asIs = document.createElement('button'); asIs.type = 'button'; asIs.className = 'family-member-choice'; asIs.textContent = '이 사진 그대로 승인'; asIs.disabled = true;
+    fetchImpl(rq.photo_url).then(r => r.ok ? r.blob() : null).then(b => { if (b) { srcBlob = b; const u = URL.createObjectURL(b); img.src = u; save.href = u; asIs.disabled = false; } }).catch(() => {});
     const who = document.createElement('p'); who.textContent = `${memberLabel(rq.member_id)} · ${rq.created_at ? new Date(rq.created_at).toLocaleString('ko-KR') : ''}`;
-    const pick = document.createElement('input'); pick.type = 'file'; pick.accept = TYPES.join(','); pick.setAttribute('aria-label', '완성 캐릭터 이미지 선택');
-    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'family-member-choice'; ok.textContent = '승인'; ok.disabled = true;
+    const pick = document.createElement('input'); pick.type = 'file'; pick.accept = TYPES.join(','); pick.setAttribute('aria-label', '② 완성 캐릭터 이미지 선택');
+    const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'family-member-choice'; ok.textContent = '③ 고른 이미지로 승인'; ok.disabled = true;
     const no = document.createElement('button'); no.type = 'button'; no.className = 'family-member-choice'; no.textContent = '반려';
+    const lockAll = v => { ok.disabled = no.disabled = asIs.disabled = v; if (!v) ok.disabled = !pick.files?.[0]; };
     const msg = document.createElement('p'); msg.setAttribute('role', 'status');
     pick.addEventListener('change', () => { ok.disabled = !pick.files?.[0]; msg.textContent = pick.files?.[0] ? '승인을 누르면 이 이미지가 캐릭터로 등록돼요.' : ''; });
-    ok.addEventListener('click', async () => {
-      ok.disabled = no.disabled = true; msg.textContent = '등록 중…';
-      const out = await approveRequest({ runtime, fetchImpl, request: rq, file: pick.files[0] }).catch(() => ({ ok: false, state: 'FAILED' }));
-      msg.textContent = out.ok ? `등록 완료 · 캐릭터 v${out.identity_version}. 원본 사진은 삭제했어요.` : `등록하지 못했어요 (${out.state}). 다시 시도해 주세요.`;
-      if (!out.ok) ok.disabled = no.disabled = false; else card.dataset.done = 'true';
-    });
+    const approve = async file => {
+      lockAll(true); msg.textContent = '등록 중…';
+      const out = await approveRequest({ runtime, fetchImpl, request: rq, file }).catch(() => ({ ok: false, state: 'FAILED' }));
+      msg.textContent = out.ok ? `등록 완료 · 캐릭터 v${out.identity_version}. 아이 앱을 다시 열면 바로 보여요.` : `등록하지 못했어요 (${out.state}). 다시 시도해 주세요.`;
+      if (!out.ok) lockAll(false); else card.dataset.done = 'true';
+    };
+    ok.addEventListener('click', () => approve(pick.files[0]));
+    asIs.addEventListener('click', () => { if (!srcBlob) return; const type = TYPES.includes(srcBlob.type) ? srcBlob.type : 'image/jpeg'; approve(new File([srcBlob], 'taky-character.' + (type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1]), { type })); });
+    // Reject deletes the child's photo for good, so it takes a second tap (Taky 2026-11-22: a request vanished).
     no.addEventListener('click', async () => {
-      no.disabled = ok.disabled = true;
+      if (no.dataset.confirm !== 'true') { no.dataset.confirm = 'true'; no.textContent = '정말 반려 (사진 삭제)'; msg.textContent = '반려하면 아이가 보낸 사진이 지워져요. 한 번 더 누르면 반려돼요.'; setTimeout(() => { if (no.dataset.confirm === 'true' && !card.dataset.done) { no.dataset.confirm = ''; no.textContent = '반려'; msg.textContent = ''; } }, 6000); return; }
+      lockAll(true);
       const r = await post('/api/family/character-request', { action: 'REJECT', family_id: await runtime.getFamilyId(), request_id: rq.request_id });
-      msg.textContent = r.ok ? '반려했어요. 원본 사진은 삭제했어요.' : '반려하지 못했어요.'; if (!r.ok) no.disabled = false;
+      msg.textContent = r.ok ? '반려했어요. 원본 사진은 삭제했어요.' : '반려하지 못했어요.'; if (!r.ok) lockAll(false); else card.dataset.done = 'true';
     });
-    card.append(img, who, save, pick, ok, no, msg); list.append(card);
+    card.append(img, who, save, asIs, pick, ok, no, msg); list.append(card);
   }
   return { ok: true, state: 'LISTED', count: reqs.length };
 }
