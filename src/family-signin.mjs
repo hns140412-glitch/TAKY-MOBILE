@@ -232,14 +232,14 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk,v
    say('Google 로그인 응답이 유효하지 않습니다.');return {ok:false,state:'CREDENTIAL_INVALID'};
   }
   say(device?'이 기기의 가족 로그인을 이어가는 중…':'중앙 가족 소속 확인 중…');
-  let ended=!device;
+  let ended=!device,unregistered=false;
   try{
    const response=await fetchImpl(new URL('/api/family/session',central).href,{
     method:'POST',cache:'no-store',redirect:'error',
     headers:{'content-type':'application/json','authorization':'Bearer '+credential},body:'{}'
    });
    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
-   if(!response.ok){if(response.status===401||response.status===403){ended=true;if(device)deviceClear()}throw Error('CENTRAL_SESSION_REJECTED')}
+   if(!response.ok){if(response.status===401||response.status===403){ended=true;if(device)deviceClear();else unregistered=true}throw Error('CENTRAL_SESSION_REJECTED')}
    const body=await response.json();
    if(ticket!==epoch)return {ok:false,state:'SUPERSEDED'};
    const families=verifyServerFamilyResponse(body);
@@ -263,7 +263,7 @@ export function createFamilySignin({fetchImpl=fetch,googleSdk=browserGoogleSdk,v
    return {ok:true,state:'FAMILY_SELECTION'};
   }catch{
    if(ticket===epoch){holder=null;resetView();
-    say(!device?'가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.':ended?'이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.':'중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요.');}
+    say(unregistered?'이 Google 계정은 아직 가족으로 등록되지 않았어요. 관리자가 등록하면 다시 로그인해 주세요.':!device?'가족 소속을 확인하지 못했습니다. 로그인 상태가 적용되지 않았습니다.':ended?'이 기기의 가족 로그인이 끝났어요. 다시 로그인해 주세요.':'중앙 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요.');}
    return {ok:false,state:!device?'CENTRAL_SESSION_REJECTED':ended?'DEVICE_SIGNIN_ENDED':'CENTRAL_LOGIN_UNAVAILABLE'};
   }
  }
