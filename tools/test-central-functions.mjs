@@ -296,7 +296,7 @@ if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> par
   const listReq = async () => (await fetchImpl(ORIGIN + '/api/family/character-request', { method: 'POST',
     headers: { Authorization: 'Bearer token-parent-aaaaaaaaaaaa', 'Content-Type': 'application/json' }, body: JSON.stringify({ family_id: 'TAKY-HOME', action: 'LIST' }) })).json();
   const runtime = { apiBaseUrl: ORIGIN + '/', getToken: async () => 'token-parent-aaaaaaaaaaaa', getFamilyId: async () => 'TAKY-HOME',
-    currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER'] }) };
+    currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER', 'SPOUSE'] }) };   // real TAKY-HOME: 3 members (2026-11-22)
   assert.equal(typeof Sync.publishMaster, 'undefined', 'Ready must not publish a master itself');
   const before = await Sync.characterStatus({ runtime, fetchImpl });
   const prevVersion = before.version || 0;
