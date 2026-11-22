@@ -1,5 +1,5 @@
 import { deriveOperations, renderOperationsStrip, renderOperationsConsole } from './admin-status.mjs';
-import { adminSession, adminLogin, adminLogout, readAdminProgress, renderAdminProgress } from './admin-progress.mjs';
+import { adminSession, adminLogin, adminFamilyLogin, adminLogout, readAdminProgress, renderAdminProgress } from './admin-progress.mjs';
 import { loadAppState, saveAppState } from './db.js';
 import { mountFamilyHub } from './family-hub.mjs';
 import { mountCharacterRequests } from './character-requests.mjs';
@@ -756,6 +756,12 @@ async function init() {
   bindResume();
   bindAdminProgress();
   await checkAdminSession();
+  // Owner auto-admin: Taky's own family sign-in opens admin without the access key.
+  window.addEventListener('taky-central-auth-ready',async()=>{
+    if(adminAuthorized)return;
+    try{const token=await globalThis.TAKY_FAMILY_RUNTIME?.getToken?.();if(!token)return;
+      const r=await adminFamilyLogin(token);if(r.authorized){setAdminAccess(true);await refreshAdminProgress()}}catch{}
+  });
   createFamilySignin().mount();
   const refreshFamily=()=>{const hub=document.getElementById('familyHub');void mountFamilyHub(hub).catch(error=>console.warn('Family hub unavailable',String(error))).then(()=>mountCharacterRequests(hub)).catch(error=>console.warn('Character requests unavailable',String(error)));};
   refreshFamily();
