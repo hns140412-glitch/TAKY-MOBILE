@@ -40,11 +40,24 @@ export function centralFor(origin, { config = readCentralConfig(), fetchImpl, oa
   const lazy = () => (blobs ||= getStore(LIVE_STORE_NAME, { consistency: 'strong' }));
   const live = liveStore || { getWithMetadata: (k, o) => lazy().getWithMetadata(k, o), setJSON: (k, v, o) => lazy().setJSON(k, v, o) };
   const objectStore = createDriveCharacterObjectStore({ drive, folderId: config.folderId, secret: config.ticketSecret, publicOrigin: origin });
+  const lookupMemberships = createDriveMembershipProvider({ drive, folderId: config.folderId });
+  const google = oauth2Client || new googleAuthLibrary.OAuth2Client();
+  // After Google has verified the token, bind an email invite (members.json row with invite_email) to this account.
+  const inviting = {
+    async verifyIdToken(opts) {
+      const ticket = await google.verifyIdToken(opts);
+      try {
+        const p = ticket?.getPayload?.();
+        if (p?.sub && p.email && p.email_verified === true) await lookupMemberships.claimInvite({ provider: 'GOOGLE_OIDC', subject: p.sub, email: p.email });
+      } catch { console.warn('TAKY_FAMILY_INVITE_CLAIM_FAILED'); }
+      return ticket;
+    },
+  };
   const host = Host.create({
     clientIds: config.clientIds,
     // Device tokens (one sign-in per device) are accepted here; Google ID tokens pass through unchanged.
-    googleAuthLibrary, oauth2Client: deviceAwareOAuthClient(oauth2Client || new googleAuthLibrary.OAuth2Client(), createDeviceTokens(config.ticketSecret)),
-    lookupMemberships: createDriveMembershipProvider({ drive, folderId: config.folderId }),
+    googleAuthLibrary, oauth2Client: deviceAwareOAuthClient(inviting, createDeviceTokens(config.ticketSecret)),
+    lookupMemberships,
     store: createRoutingStore({ driveStore: createDriveJsonStore({ drive, folderId: config.folderId }), liveStore: live }),
     characterAssetObjectStore: objectStore,
     // Same fail-closed learning stubs as the PC pilot: no browser claim becomes real evidence.

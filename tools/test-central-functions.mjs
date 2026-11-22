@@ -67,10 +67,11 @@ function memoryStore() {
 }
 const CLIENT = '15791067602-lvao9ohkbj3l5s3clbfb9n106uqssaol.apps.googleusercontent.com';
 const oauth2Client = { async verifyIdToken({ idToken, audience }) {
-  const sub = { 'token-parent-aaaaaaaaaaaa': '111', 'token-stranger-aaaaaaaaaa': '999' }[idToken];
+  const sub = { 'token-parent-aaaaaaaaaaaa': '111', 'token-stranger-aaaaaaaaaa': '999', 'token-invitee-aaaaaaaaaa': '777', 'token-unverified-aaaaaaa': '778' }[idToken];
   if (!sub) throw Error('bad token');
   const now = Math.floor(Date.now() / 1000);
-  return { getPayload: () => ({ iss: 'https://accounts.google.com', aud: audience[0], sub, iat: now - 5, exp: now + 3000 }) };
+  const mail = { '777': { email: 'Kid@Example.com', email_verified: true }, '778': { email: 'other@example.com', email_verified: false } }[sub] || {};
+  return { getPayload: () => ({ iss: 'https://accounts.google.com', aud: audience[0], sub, iat: now - 5, exp: now + 3000, ...mail }) };
 } };
 const env = o => name => o[name] ?? '';
 const baseEnv = { TAKY_GOOGLE_WEB_CLIENT_ID: CLIENT, TAKY_CENTRAL_ALLOWED_ORIGINS: ORIGIN + ',' + SAVEY,
@@ -318,6 +319,25 @@ if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> par
   assert.equal(after.requests.filter(r => r.member_id === 'CHILD').length, 0, 'source photo deleted on approval');
   const none = await Sync.requestCharacter({ photo, runtime: null, fetchImpl });
   assert.equal(none.state, 'PENDING_TAKY_SESSION', 'no session -> nothing sent');
+});
+
+await t('email invite: first verified sign-in binds the account; unverified email does not', async () => {
+  const d = fakeDrive();
+  d.seed('members.json', [
+    { provider: 'GOOGLE_OIDC', subject: '111', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'OWNER', role: 'PARENT', learning_evidence_submit_member_ids: ['KID'], permissions: [] },
+    { provider: 'GOOGLE_OIDC', invite_email: 'kid@example.com', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'KID', role: 'CHILD', learning_evidence_submit_member_ids: ['KID'] },
+    { provider: 'GOOGLE_OIDC', invite_email: 'other@example.com', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'MOM', role: 'PARENT', learning_evidence_submit_member_ids: [] },
+  ]);
+  const ci = centralFor(ORIGIN, { config, fetchImpl: d.fetchImpl, oauth2Client, liveStore: memoryStore() });
+  const go = token => runNodeBridge(ci.host.handler, new Request(ORIGIN + '/api/family/session', { method: 'POST', headers: { Origin: ORIGIN, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}' }));
+  const r = await go('token-invitee-aaaaaaaaaa'); const j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j));
+  assert.deepEqual(j.session.families.map(f => f.self_member_id), ['KID']);
+  const rows = JSON.parse([...d.files.values()].find(f => f.name === 'members.json').bytes.toString('utf8'));
+  assert.equal(rows[1].subject, '777'); assert.ok(rows[1].claimed_at);
+  assert.equal((await go('token-invitee-aaaaaaaaaa')).status, 200, 'second sign-in still works');
+  assert.equal((await go('token-unverified-aaaaaaa')).status, 401, 'unverified email cannot claim');
+  assert.equal(JSON.parse([...d.files.values()].find(f => f.name === 'members.json').bytes.toString('utf8'))[2].subject, undefined);
 });
 
 console.log(`central functions: ${passed} passed`);

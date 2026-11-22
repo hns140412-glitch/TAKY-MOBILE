@@ -135,22 +135,49 @@ export function createRoutingStore({ driveStore, liveStore }) {
 // the PC pilot C:\TAKY_CENTRAL_LOCAL\members.json). A parent may edit it in Drive.
 export function createDriveMembershipProvider({ drive, folderId, ttlMs = 30_000, now = Date.now }) {
   let cache = null;
-  async function rows() {
-    if (cache && now() - cache.at < ttlMs) return cache.rows;
+  async function load() {
     const f = (await drive.find({ parent: folderId, name: 'members.json' }))[0];
     if (!f) throw Error('CENTRAL_MEMBER_REGISTRY_MISSING');
     const parsed = JSON.parse(await drive.readText(f.id));
     if (!Array.isArray(parsed)) throw Error('CENTRAL_MEMBER_REGISTRY_INVALID');
     cache = { at: now(), rows: parsed };
-    return parsed;
+    return { file: f, rows: parsed };
   }
-  return async function lookupMemberships({ provider, subject }) {
-    const found = (await rows()).filter(r => r && r.provider === provider && r.subject === subject)
-      .map(({ provider: _p, subject: _s, note: _n, ...m }) => m);
+  async function rows() {
+    if (cache && now() - cache.at < ttlMs) return cache.rows;
+    return (await load()).rows;
+  }
+  const match = (list, provider, subject) => list.filter(r => r && r.provider === provider && typeof r.subject === 'string' && r.subject === subject)
+    .map(({ provider: _p, subject: _s, note: _n, invite_email: _i, claimed_at: _c, ...m }) => m);
+  async function lookupMemberships({ provider, subject }) {
+    const cached = !!(cache && now() - cache.at < ttlMs);
+    let found = match(await rows(), provider, subject);
+    // A member just added (or an invite just claimed) on another instance: re-read once before refusing.
+    if (!found.length && cached) found = match((await load()).rows, provider, subject);
     // Verified Google account with no registry row: log its stable subject so an admin can add it to members.json.
     if (!found.length) console.warn('TAKY_FAMILY_UNREGISTERED provider=' + provider + ' subject=' + subject);
     return found;
+  }
+  // An admin pre-registers a member by email: a row with invite_email and no subject.
+  // The first sign-in with a Google-verified matching email binds that account's subject to the row.
+  lookupMemberships.claimInvite = async function claimInvite({ provider, subject, email }) {
+    const want = String(email || '').trim().toLowerCase();
+    if (!want || !subject) return 0;
+    const { file, rows: list } = await load();
+    if (list.some(r => r && r.provider === provider && r.subject === subject)) return 0;
+    let n = 0;
+    for (const r of list) {
+      if (r && r.provider === provider && !r.subject && String(r.invite_email || '').trim().toLowerCase() === want) {
+        r.subject = subject; r.claimed_at = new Date(now()).toISOString(); n++;
+      }
+    }
+    if (!n) return 0;
+    await drive.update(file.id, { bytes: Buffer.from(JSON.stringify(list, null, 2) + '\n') });
+    cache = { at: now(), rows: list };
+    console.log('TAKY_FAMILY_INVITE_CLAIMED rows=' + n + ' subject=' + subject);
+    return n;
   };
+  return lookupMemberships;
 }
 
 // Character image object store on Drive with short-lived HMAC tickets that the
