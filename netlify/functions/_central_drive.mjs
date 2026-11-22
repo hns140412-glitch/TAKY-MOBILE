@@ -145,8 +145,11 @@ export function createDriveMembershipProvider({ drive, folderId, ttlMs = 30_000,
     return parsed;
   }
   return async function lookupMemberships({ provider, subject }) {
-    return (await rows()).filter(r => r && r.provider === provider && r.subject === subject)
+    const found = (await rows()).filter(r => r && r.provider === provider && r.subject === subject)
       .map(({ provider: _p, subject: _s, note: _n, ...m }) => m);
+    // Verified Google account with no registry row: log its stable subject so an admin can add it to members.json.
+    if (!found.length) console.warn('TAKY_FAMILY_UNREGISTERED provider=' + provider + ' subject=' + subject);
+    return found;
   };
 }
 
