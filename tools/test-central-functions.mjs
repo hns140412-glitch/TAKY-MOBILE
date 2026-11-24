@@ -339,7 +339,7 @@ if (process.env.READY_REPO) await t('재능 week: photos to Drive -> render PC i
     fs.writeFileSync(path.join(dir, 'device-token.txt'), createDeviceTokens(config.ticketSecret).issue('555').token);
     const cfg = path.join(dir, 'cfg.json'); fs.writeFileSync(cfg, JSON.stringify({ central: CENTRAL, family_id: 'TAKY-HOME', member_id: 'CHILD', device_token_file: path.join(dir, 'device-token.txt'), work_dir: path.join(dir, 'work') }));
     const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
-    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nls *.jpg > seen.txt\necho \'Reading the photos.\'\necho \'{"books":[{"key":"calc","range_text":"21~26쪽","confidence":"high"},{"key":"hanja","range_text":"11~16쪽","confidence":"high"}],"hanja_chars":"日月火水木","hanja_confidence":"high"}\'\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nls *.jpg > seen.txt\necho \'Reading the photos.\'\necho \'{"books":[{"key":"calc","range_text":"21~26쪽","confidence":"high"},{"key":"hanja","range_text":"11~16쪽","confidence":"high"}],"hanja_chars":"日月火水木","hanja_confidence":"high","hanja_items":[{"char":"日","meaning":"날","reading":"일"},{"char":"月","meaning":"달","reading":"월"},{"char":"金","meaning":"쇠","reading":"금"},{"char":"火","meaning":"fire","reading":"화"}]}\'\n', { mode: 0o755 });
     process.env.PATH = bin + path.delimiter + process.env.PATH;
     const T = await import(path.join(process.env.READY_REPO, 'tools/render-talent/talent-interpret.mjs'));
     const out = await T.runOnce(T.loadConfig(cfg));
@@ -364,6 +364,7 @@ if (process.env.READY_REPO) await t('재능 week: photos to Drive -> render PC i
     assert.equal((await Parent.syncPlanner()).applied, 0, 'applied once per update');
     const hide = await (await route(`${CENTRAL}/api/family/user-data?family_id=TAKY-HOME&member_id=CHILD&record_type=MATERIAL_REFERENCE&record_id=ready-talent-week-current`, { headers: H })).json();
     assert.equal(hide.record.payload.hanja.chars.join(''), '日月火水木', 'Hide reads the week 한자');
+    assert.deepEqual(hide.record.payload.hanja.items, [{ char: '日', meaning: '날', reading: '일' }, { char: '月', meaning: '달', reading: '월' }], 'Hide gets the worksheet 훈음, only valid ones for this week');
   } finally { globalThis.fetch = realFetch; for (const k of ['TAKY_FAMILY_RUNTIME', 'ReadySetPlanner', 'RsTakyCharacterSync', 'localStorage']) delete globalThis[k]; }
 });
 
