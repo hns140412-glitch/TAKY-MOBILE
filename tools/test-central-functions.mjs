@@ -278,6 +278,96 @@ await t('device sign-in: Google once -> device token works on the real vendored 
   members.bytes = keep;
 });
 
+await t('material photo: 재능 homework photo -> family Drive -> list by week -> read -> delete; scoped to family member', async () => {
+  const { materialPhotoFor } = await import('../netlify/functions/material-photo.mjs');
+  const mp = materialPhotoFor({ config, fetchImpl: drive.fetchImpl, oauth2Client });
+  const go = (q, { method = 'GET', token = 'token-parent-aaaaaaaaaaaa', body, type } = {}) => mp.handle(new Request(ORIGIN + '/api/family/material-photo?' + new URLSearchParams(q),
+    { method, headers: { Origin: ORIGIN, ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(type ? { 'Content-Type': type } : {}) }, body }));
+  const img = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), crypto.randomBytes(3000)]);
+  const scope = { family_id: 'TAKY-HOME', member_id: 'CHILD' };
+  assert.equal((await go({ ...scope, week_id: '2026-11-24', book: 'hanja' }, { method: 'POST', body: img, type: 'image/jpeg', token: 'token-stranger-aaaaaaaaaa' })).status, 401);
+  assert.equal((await go({ family_id: 'TAKY-HOME', member_id: 'SPOUSE', week_id: '2026-11-24', book: 'hanja' }, { method: 'POST', body: img, type: 'image/jpeg' })).status, 403, 'member not granted');
+  assert.equal((await go({ ...scope, week_id: '2026-11-24', book: 'hanja' }, { method: 'POST', body: 'x', type: 'text/plain' })).status, 415);
+  let r = await go({ ...scope, week_id: '2026-11-24', book: 'hanja' }, { method: 'POST', body: img, type: 'image/jpeg' }); let j = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(j)); const ref = j.photo_ref;
+  j = await (await go({ ...scope, week_id: '2026-11-24', book: 'hanja' }, { method: 'POST', body: img, type: 'image/jpeg' })).json();
+  assert.equal(j.photo_ref, ref); assert.equal(j.duplicate, true, 'same photo twice -> one Drive file');
+  j = await (await go({ ...scope, week_id: '2026-11-24' })).json();
+  assert.deepEqual(j.photos.map(x => [x.photo_ref, x.book]), [[ref, 'hanja']]);
+  assert.equal((await (await go({ ...scope, week_id: '2026-12-01' })).json()).photos.length, 0);
+  r = await go({ ...scope, ref }); assert.equal(r.status, 200); assert.equal(Buffer.compare(Buffer.from(await r.arrayBuffer()), img), 0);
+  assert.equal((await go({ family_id: 'OTHER-FAM', member_id: 'CHILD', ref })).status, 403);
+  const character = [...drive.files.values()].find(f => f.appProperties?.taky_kind === 'character-asset');
+  if (character) assert.equal((await go({ ...scope, ref: character.id })).status, 404, 'cannot read other Drive files through this endpoint');
+  assert.equal((await go({ ...scope, ref }, { method: 'DELETE' })).status, 200);
+  assert.equal((await go({ ...scope, ref })).status, 404);
+});
+
+// Cross-repo: Ready 보호자 photos -> family Drive -> render PC CLI reads them -> week CONFIRMED -> the child's Ready Planner.
+// Run with READY_REPO=<path to the Ready & Set repo>; the CLI is a stub on PATH (no paid API, no real model call).
+if (process.env.READY_REPO) await t('재능 week: photos to Drive -> render PC interprets with the CLI -> child device Planner gets the split', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const { createRequire } = await import('node:module'); const req = createRequire(import.meta.url);
+  const { materialPhotoFor } = await import('../netlify/functions/material-photo.mjs');
+  const { createDeviceTokens } = await import('../netlify/functions/_family_device.mjs');
+  const mp = materialPhotoFor({ config, fetchImpl: drive.fetchImpl, oauth2Client });
+  const CENTRAL = 'https://taky-mobile.example';
+  const route = async (url, init = {}) => {
+    const u = new URL(url); const reqInit = { method: init.method || 'GET', headers: { Origin: ORIGIN, ...(init.headers || {}) }, body: init.body };
+    const r = new Request(ORIGIN + u.pathname + u.search, reqInit);
+    return u.pathname === '/api/family/material-photo' ? mp.handle(r) : runNodeBridge(c.host.handler, r);
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (url, init) => String(url).startsWith(CENTRAL) ? route(String(url), init) : realFetch(url, init);
+  try {
+    const Parent = req(path.join(process.env.READY_REPO, 'rs/rs-parent.js'));
+    const tue = new Date(2026, 10, 24, 20).getTime(), week = Parent.weekOf(tue);
+    // Parent phone: two photos (연산, 한자) and a photos-only week record, as rs-parent.js sends them.
+    const H = { authorization: 'Bearer token-parent-aaaaaaaaaaaa' };
+    const up = async book => (await (await route(`${CENTRAL}/api/family/material-photo?family_id=TAKY-HOME&member_id=CHILD&week_id=${week.week_id}&book=${book}`,
+      { method: 'POST', headers: { ...H, 'Content-Type': 'image/jpeg' }, body: Buffer.concat([Buffer.from([0xff, 0xd8]), crypto.randomBytes(900)]) })).json()).photo_ref;
+    const refs = { calc: await up('calc'), hanja: await up('hanja') };
+    const books = Parent.BOOKS.map(b => ({ key: b.key, subject: b.subject, range_text: '', photo_refs: refs[b.key] ? [refs[b.key]] : [], parts: [] }));
+    const payload = { schema: 'READY_TALENT_WEEK_V1', state: 'PHOTOS_UPLOADED', ...week, days: Parent.daysFor(week, tue), books, hanja: { chars: [], range_text: '', practice_label: '이번 주 구간' }, updated_at: new Date(tue).toISOString() };
+    let r = await route(`${CENTRAL}/api/family/user-data`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record: { family_id: 'TAKY-HOME', member_id: 'CHILD', record_type: 'MATERIAL_REFERENCE', record_id: 'ready-talent-week-current', status: 'CONFIRMED', source_app: 'ready-set', payload } }) });
+    assert.ok(r.ok, await r.clone().text());
+    // Render PC: a child-scoped device token (minted the way the PC gets one), a stub `claude` on PATH.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'render-talent-'));
+    drive.files.get('seed_members.json').bytes = Buffer.from(JSON.stringify([...JSON.parse(drive.files.get('seed_members.json').bytes),
+      { provider: 'GOOGLE_OIDC', subject: '555', status: 'ACTIVE', family_id: 'TAKY-HOME', self_member_id: 'CHILD', role: 'CHILD', learning_evidence_submit_member_ids: ['CHILD'], permissions: [] }]));
+    fs.writeFileSync(path.join(dir, 'device-token.txt'), createDeviceTokens(config.ticketSecret).issue('555').token);
+    const cfg = path.join(dir, 'cfg.json'); fs.writeFileSync(cfg, JSON.stringify({ central: CENTRAL, family_id: 'TAKY-HOME', member_id: 'CHILD', device_token_file: path.join(dir, 'device-token.txt'), work_dir: path.join(dir, 'work') }));
+    const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nls *.jpg > seen.txt\necho \'Reading the photos.\'\necho \'{"books":[{"key":"calc","range_text":"21~26쪽","confidence":"high"},{"key":"hanja","range_text":"11~16쪽","confidence":"high"}],"hanja_chars":"日月火水木","hanja_confidence":"high","hanja_items":[{"char":"日","meaning":"날","reading":"일"},{"char":"月","meaning":"달","reading":"월"},{"char":"金","meaning":"쇠","reading":"금"},{"char":"火","meaning":"fire","reading":"화"}]}\'\n', { mode: 0o755 });
+    process.env.PATH = bin + path.delimiter + process.env.PATH;
+    const T = await import(path.join(process.env.READY_REPO, 'tools/render-talent/talent-interpret.mjs'));
+    const out = await T.runOnce(T.loadConfig(cfg));
+    assert.equal(out.state, 'CONFIRMED', JSON.stringify(out).slice(0, 400));
+    assert.equal(fs.readdirSync(path.join(dir, 'work')).length, 1);
+    const seen = fs.readFileSync(path.join(dir, 'work', fs.readdirSync(path.join(dir, 'work'))[0], 'seen.txt'), 'utf8');
+    assert.match(seen, /calc-1\.jpg/); assert.match(seen, /hanja-1\.jpg/);
+    assert.equal((await T.runOnce(T.loadConfig(cfg))).state, 'NOTHING', 'a second run does not read again');
+    // Unsure answer -> INTERPRETED (parent confirms), Planner untouched.
+    const merged = T.merge(payload, { books: [{ key: 'calc', range_text: '21~26쪽', confidence: 'low' }] }, Parent, tue);
+    assert.equal(merged.payload.state, 'INTERPRETED');
+    // The child's Ready: its own Planner gets the CONFIRMED split once.
+    const mem = new Map(); const ls = { getItem: k => mem.has(k) ? mem.get(k) : null, setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k) };
+    const P = req(path.join(process.env.READY_REPO, 'ready-planner-v01.js')).createPlanner(ls);
+    Object.assign(globalThis, { localStorage: ls, ReadySetPlanner: P, RsTakyCharacterSync: req(path.join(process.env.READY_REPO, 'rs/rs-taky-character-sync.js')),
+      TAKY_FAMILY_RUNTIME: { apiBaseUrl: CENTRAL + '/', getToken: async () => 'token-parent-aaaaaaaaaaaa', getFamilyId: async () => 'TAKY-HOME',
+        currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER', 'SPOUSE'] }) } });
+    globalThis.dispatchEvent = globalThis.dispatchEvent || (() => {});
+    const s1 = await Parent.syncPlanner(); assert.equal(s1.applied, 12, JSON.stringify(s1));
+    const todos = P.snapshot().dated_todos.filter(x => x.source_actor === 'PARENT_TALENT');
+    assert.deepEqual(todos.filter(x => /연산/.test(x.label)).map(x => x.label), ['재능 연산 · 21쪽', '재능 연산 · 22쪽', '재능 연산 · 23쪽', '재능 연산 · 24쪽', '재능 연산 · 25쪽', '재능 연산 · 26쪽']);
+    assert.equal((await Parent.syncPlanner()).applied, 0, 'applied once per update');
+    const hide = await (await route(`${CENTRAL}/api/family/user-data?family_id=TAKY-HOME&member_id=CHILD&record_type=MATERIAL_REFERENCE&record_id=ready-talent-week-current`, { headers: H })).json();
+    assert.equal(hide.record.payload.hanja.chars.join(''), '日月火水木', 'Hide reads the week 한자');
+    assert.deepEqual(hide.record.payload.hanja.items, [{ char: '日', meaning: '날', reading: '일' }, { char: '月', meaning: '달', reading: '월' }], 'Hide gets the worksheet 훈음, only valid ones for this week');
+  } finally { globalThis.fetch = realFetch; for (const k of ['TAKY_FAMILY_RUNTIME', 'ReadySetPlanner', 'RsTakyCharacterSync', 'localStorage']) delete globalThis[k]; }
+});
+
 // Cross-repo contract: Ready & Set's no-cost character request against THESE real handlers + TAKY Mobile's parent approval.
 // Run with READY_CHARACTER_SYNC_MODULE=<path to Ready rs/rs-taky-character-sync.js>; skipped otherwise.
 if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> parent approves in TAKY Mobile -> Ready reads the master back', async () => {
@@ -296,7 +386,7 @@ if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> par
   const listReq = async () => (await fetchImpl(ORIGIN + '/api/family/character-request', { method: 'POST',
     headers: { Authorization: 'Bearer token-parent-aaaaaaaaaaaa', 'Content-Type': 'application/json' }, body: JSON.stringify({ family_id: 'TAKY-HOME', action: 'LIST' }) })).json();
   const runtime = { apiBaseUrl: ORIGIN + '/', getToken: async () => 'token-parent-aaaaaaaaaaaa', getFamilyId: async () => 'TAKY-HOME',
-    currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER'] }) };
+    currentSession: async () => ({ family_id: 'TAKY-HOME', self_member_id: 'OWNER', authorized_member_ids: ['CHILD', 'OWNER', 'SPOUSE'] }) };   // real TAKY-HOME: 3 members (2026-11-22)
   assert.equal(typeof Sync.publishMaster, 'undefined', 'Ready must not publish a master itself');
   const before = await Sync.characterStatus({ runtime, fetchImpl });
   const prevVersion = before.version || 0;
