@@ -368,6 +368,75 @@ if (process.env.READY_REPO) await t('재능 week: photos to Drive -> render PC i
   } finally { globalThis.fetch = realFetch; for (const k of ['TAKY_FAMILY_RUNTIME', 'ReadySetPlanner', 'RsTakyCharacterSync', 'localStorage']) delete globalThis[k]; }
 });
 
+// Cloud mode (Taky 2026-11-25): the scheduled cloud Claude run holds only TAKY_TALENT_AGENT_KEY, trades it for a
+// 15-minute parent token, fetches the photos, reads them itself and applies its answer. No render PC, no token on disk.
+if (process.env.READY_REPO) await t('재능 week, cloud: agent key -> parent token -> fetch photos -> Claude answer -> CONFIRMED for the child', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const { createRequire } = await import('node:module'); const req = createRequire(import.meta.url);
+  const { materialPhotoFor } = await import('../netlify/functions/material-photo.mjs');
+  const { talentAgentFor } = await import('../netlify/functions/talent-agent.mjs');
+  const KEY = crypto.randomBytes(32).toString('hex');
+  const mp = materialPhotoFor({ config, fetchImpl: drive.fetchImpl, oauth2Client });
+  const ag = talentAgentFor({ config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live, agentKey: KEY });
+  const agent = (body, headers = {}) => ag.handle(new Request(ORIGIN + '/api/family/talent-agent', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }));
+  assert.equal((await agent({ family_id: 'TAKY-HOME' })).status, 401, 'no key');
+  assert.equal((await agent({ family_id: 'TAKY-HOME' }, { 'x-taky-agent-key': KEY.slice(0, -1) + 'x' })).status, 401, 'wrong key');
+  assert.equal((await agent({ family_id: 'TAKY-HOME' }, { 'x-taky-agent-key': KEY, origin: ORIGIN })).status, 403, 'never from a browser');
+  assert.equal((await agent({ family_id: 'NOPE' }, { 'x-taky-agent-key': KEY })).status, 404);
+  assert.equal((await talentAgentFor({ config, fetchImpl: drive.fetchImpl, oauth2Client, liveStore: live, agentKey: '' }).handle(new Request(ORIGIN + '/x', { method: 'POST', headers: { 'x-taky-agent-key': 'x'.repeat(40) }, body: '{}' }))).status, 503, 'no key configured -> closed');
+  const K = { 'x-taky-agent-key': KEY };
+  assert.equal((await agent({ family_id: 'TAKY-HOME', op: 'session' }, K)).status, 400, 'only the three ops');
+  assert.equal((await agent({ family_id: 'TAKY-HOME', op: 'get_week', record_id: 'character-profile' }, K)).status, 400, 'only 재능 week records');
+  assert.equal((await agent({ family_id: 'TAKY-HOME', op: 'put_week', record: { record_id: 'ready-talent-week-current', record_type: 'MATERIAL_REFERENCE', payload: { schema: 'OTHER', state: 'CONFIRMED' } } }, K)).status, 400);
+  const CENTRAL = 'https://taky-mobile.example';
+  const route = async (url, init = {}) => {
+    const u = new URL(url); const h = { ...(init.headers || {}) };
+    if (u.pathname === '/api/family/talent-agent') return ag.handle(new Request(ORIGIN + u.pathname, { method: init.method, headers: h, body: init.body }));
+    const r = new Request(ORIGIN + u.pathname + u.search, { method: init.method || 'GET', headers: { Origin: ORIGIN, ...h }, body: init.body });
+    return u.pathname === '/api/family/material-photo' ? mp.handle(r) : runNodeBridge(c.host.handler, r);
+  };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (url, init) => String(url).startsWith(CENTRAL) ? route(String(url), init) : realFetch(url, init);
+  const keep = { k: process.env.TAKY_TALENT_AGENT_KEY, c: process.env.TAKY_CENTRAL, w: process.env.TAKY_TALENT_WORK_DIR };
+  try {
+    const Parent = req(path.join(process.env.READY_REPO, 'rs/rs-parent.js'));
+    const tue = new Date(2026, 11, 1, 20).getTime(), week = Parent.weekOf(tue);
+    const H = { authorization: 'Bearer token-parent-aaaaaaaaaaaa' };
+    const up = async book => (await (await route(`${CENTRAL}/api/family/material-photo?family_id=TAKY-HOME&member_id=CHILD&week_id=${week.week_id}&book=${book}`,
+      { method: 'POST', headers: { ...H, 'Content-Type': 'image/jpeg' }, body: Buffer.concat([Buffer.from([0xff, 0xd8]), crypto.randomBytes(700)]) })).json()).photo_ref;
+    const refs = { korean: await up('korean'), hanja: await up('hanja') };
+    const books = Parent.BOOKS.map(b => ({ key: b.key, subject: b.subject, range_text: '', photo_refs: refs[b.key] ? [refs[b.key]] : [], parts: [] }));
+    const payload = { schema: 'READY_TALENT_WEEK_V1', state: 'PHOTOS_UPLOADED', ...week, days: Parent.daysFor(week, tue), books, hanja: { chars: [], range_text: '', practice_label: '이번 주 구간' }, updated_at: new Date(tue).toISOString() };
+    const cur = await (await route(`${CENTRAL}/api/family/user-data?family_id=TAKY-HOME&member_id=CHILD&record_type=MATERIAL_REFERENCE&record_id=ready-talent-week-current`, { headers: H })).json();
+    let r = await route(`${CENTRAL}/api/family/user-data`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record: { family_id: 'TAKY-HOME', member_id: 'CHILD', record_type: 'MATERIAL_REFERENCE', record_id: 'ready-talent-week-current', status: 'CONFIRMED', source_app: 'ready-set', payload }, ...(cur.etag ? { expected_etag: cur.etag } : {}) }) });
+    assert.ok(r.ok, await r.clone().text());
+    Object.assign(process.env, { TAKY_TALENT_AGENT_KEY: KEY, TAKY_CENTRAL: CENTRAL, TAKY_TALENT_WORK_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-talent-')) });
+    const T = await import(path.join(process.env.READY_REPO, 'tools/render-talent/talent-interpret.mjs'));
+    const ac = await T.agentConfig();
+    assert.equal(ac.member_id, 'CHILD', 'the parent writes for the granted child');
+    assert.equal((await agent({ family_id: 'TAKY-HOME', op: 'photo', ref: 'not_in_this_week_123' }, { 'x-taky-agent-key': KEY })).status, 404, 'only photos the week names');
+    const f = await T.runOnce(ac, { fetchOnly: true });
+    assert.equal(f.state, 'FETCHED', JSON.stringify(f)); assert.equal(f.files.length, 2);
+    assert.ok(fs.existsSync(path.join(f.dir, 'TASK_CONTRACT.md')));
+    for (const x of f.files) assert.ok(fs.statSync(x).size > 500, 'photo bytes downloaded');
+    // The cloud Claude run reads the photos and answers; one book unsure -> INTERPRETED (the parent confirms once).
+    const unsure = await T.runOnce(await T.agentConfig(), { answer: { books: [{ key: 'korean', range_text: '40~45쪽', confidence: 'high' }, { key: 'hanja', range_text: '11~16쪽', confidence: 'low' }], hanja_chars: '日月', hanja_confidence: 'high' }, dry: true });
+    assert.equal(unsure.state, 'DRY'); assert.equal(unsure.payload.state, 'INTERPRETED');
+    const done = await T.runOnce(await T.agentConfig(), { answer: { books: [{ key: 'korean', range_text: '40~45쪽', confidence: 'high' }, { key: 'hanja', range_text: '11~16쪽', confidence: 'high' }], hanja_chars: '日月火', hanja_confidence: 'high', hanja_items: [{ char: '日', meaning: '날', reading: '일' }] } });
+    assert.equal(done.state, 'CONFIRMED', JSON.stringify(done).slice(0, 300));
+    const hide = await (await route(`${CENTRAL}/api/family/user-data?family_id=TAKY-HOME&member_id=CHILD&record_type=MATERIAL_REFERENCE&record_id=ready-talent-week-current`, { headers: H })).json();
+    assert.equal(hide.record.payload.interpreted_by, 'CLOUD_CLAUDE');
+    assert.equal(hide.record.payload.hanja.chars.join(''), '日月火');
+    assert.deepEqual(hide.record.payload.hanja.items, [{ char: '日', meaning: '날', reading: '일' }]);
+    assert.equal(hide.record.payload.books.find(b => b.key === 'korean').parts.length, 6);
+    assert.equal((await T.runOnce(await T.agentConfig(), { fetchOnly: true })).state, 'NOTHING', 'confirmed week is not fetched again');
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const [k, v] of [['TAKY_TALENT_AGENT_KEY', keep.k], ['TAKY_CENTRAL', keep.c], ['TAKY_TALENT_WORK_DIR', keep.w]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});
+
 // Cross-repo contract: Ready & Set's no-cost character request against THESE real handlers + TAKY Mobile's parent approval.
 // Run with READY_CHARACTER_SYNC_MODULE=<path to Ready rs/rs-taky-character-sync.js>; skipped otherwise.
 if (process.env.READY_CHARACTER_SYNC_MODULE) await t('Ready photo request -> parent approves in TAKY Mobile -> Ready reads the master back', async () => {
